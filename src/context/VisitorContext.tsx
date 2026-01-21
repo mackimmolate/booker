@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus } from '../types';
 
-const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
+interface ExtendedVisitorContextType extends VisitorContextType {
+  uniqueHosts: string[];
+  uniqueVisitors: { name: string; company: string; email: string }[];
+}
+
+const VisitorContext = createContext<ExtendedVisitorContextType | undefined>(undefined);
 
 const STORAGE_KEY_VISITORS = 'vms_visitors';
 const STORAGE_KEY_LOGS = 'vms_logs';
@@ -35,6 +40,18 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
   }, [logs]);
+
+  // Derived state for autocomplete
+  const uniqueHosts = Array.from(new Set(visitors.map(v => v.host).filter(Boolean))).sort();
+  const uniqueVisitors = Object.values(
+    visitors.reduce((acc, v) => {
+      if (!acc[v.name]) {
+        acc[v.name] = { name: v.name, company: v.company, email: v.email || '' };
+      }
+      return acc;
+    }, {} as Record<string, { name: string; company: string; email: string }>)
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
 
   const addLog = (visitor: Visitor, action: LogEntry['action']) => {
     const newLog: LogEntry = {
@@ -115,7 +132,16 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   return (
-    <VisitorContext.Provider value={{ visitors, logs, addVisitor, checkIn, checkOut, registerWalkIn }}>
+    <VisitorContext.Provider value={{
+      visitors,
+      logs,
+      addVisitor,
+      checkIn,
+      checkOut,
+      registerWalkIn,
+      uniqueHosts,
+      uniqueVisitors
+    }}>
       {children}
     </VisitorContext.Provider>
   );

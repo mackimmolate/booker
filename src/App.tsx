@@ -8,10 +8,10 @@ const Landing = () => (
     <h1 className="text-4xl font-bold text-gray-900">Visitor Management System</h1>
     <div className="flex flex-col sm:flex-row gap-4">
       <Link to="/admin">
-        <Button size="lg" className="w-48 h-16 text-lg">Admin / Booking</Button>
+        <Button size="lg" className="w-48 h-16 text-lg bg-slate-700 hover:bg-slate-800">Admin / Booking</Button>
       </Link>
       <Link to="/reception">
-        <Button size="lg" variant="secondary" className="w-48 h-16 text-lg">Reception Kiosk</Button>
+        <Button size="lg" className="w-48 h-16 text-lg bg-slate-700 hover:bg-slate-800">Reception Kiosk</Button>
       </Link>
     </div>
   </div>
