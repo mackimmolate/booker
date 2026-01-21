@@ -1,36 +1,53 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus } from '../types';
+import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor } from '../types';
 
-interface ExtendedVisitorContextType extends VisitorContextType {
-  uniqueHosts: string[];
-  uniqueVisitors: { name: string; company: string; email: string }[];
-}
-
-const VisitorContext = createContext<ExtendedVisitorContextType | undefined>(undefined);
+const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
 
 const STORAGE_KEY_VISITORS = 'vms_visitors';
 const STORAGE_KEY_LOGS = 'vms_logs';
+const STORAGE_KEY_SAVED_HOSTS = 'vms_saved_hosts';
+const STORAGE_KEY_SAVED_VISITORS = 'vms_saved_visitors';
 
 export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-
-  // Load from local storage on mount
-  useEffect(() => {
+  const [visitors, setVisitors] = useState<Visitor[]>(() => {
     try {
-      const storedVisitors = localStorage.getItem(STORAGE_KEY_VISITORS);
-      const storedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
-
-      if (storedVisitors) {
-        setVisitors(JSON.parse(storedVisitors));
-      }
-      if (storedLogs) {
-        setLogs(JSON.parse(storedLogs));
-      }
+      const stored = localStorage.getItem(STORAGE_KEY_VISITORS);
+      return stored ? JSON.parse(stored) : [];
     } catch (e) {
-      console.error("Failed to load from local storage", e);
+      console.error("Failed to load visitors from local storage", e);
+      return [];
     }
-  }, []);
+  });
+
+  const [logs, setLogs] = useState<LogEntry[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_LOGS);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error("Failed to load logs from local storage", e);
+      return [];
+    }
+  });
+
+  const [savedHosts, setSavedHosts] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_SAVED_HOSTS);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error("Failed to load saved hosts from local storage", e);
+      return [];
+    }
+  });
+
+  const [savedVisitors, setSavedVisitors] = useState<SavedVisitor[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_SAVED_VISITORS);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error("Failed to load saved visitors from local storage", e);
+      return [];
+    }
+  });
 
   // Save to local storage whenever state changes
   useEffect(() => {
@@ -41,15 +58,28 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
   }, [logs]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SAVED_HOSTS, JSON.stringify(savedHosts));
+  }, [savedHosts]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SAVED_VISITORS, JSON.stringify(savedVisitors));
+  }, [savedVisitors]);
+
   // Derived state for autocomplete
-  const uniqueHosts = Array.from(new Set(visitors.map(v => v.host).filter(Boolean))).sort();
+  const uniqueHosts = Array.from(new Set([
+    ...savedHosts,
+    ...visitors.map(v => v.host).filter(Boolean)
+  ])).sort();
+
   const uniqueVisitors = Object.values(
-    visitors.reduce((acc, v) => {
-      if (!acc[v.name]) {
-        acc[v.name] = { name: v.name, company: v.company, email: v.email || '' };
-      }
-      return acc;
-    }, {} as Record<string, { name: string; company: string; email: string }>)
+    [...savedVisitors, ...visitors.map(v => ({ name: v.name, company: v.company, email: v.email || '' }))]
+      .reduce((acc, v) => {
+        if (!acc[v.name]) {
+          acc[v.name] = v;
+        }
+        return acc;
+      }, {} as Record<string, SavedVisitor>)
   ).sort((a, b) => a.name.localeCompare(b.name));
 
 
@@ -131,16 +161,35 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const addSavedHost = (name: string) => {
+    setSavedHosts(prev => {
+      if (prev.includes(name)) return prev;
+      return [...prev, name];
+    });
+  };
+
+  const addSavedVisitor = (visitor: SavedVisitor) => {
+    setSavedVisitors(prev => {
+      // Check if name already exists, if so, maybe update it? Or just ignore.
+      // For now, let's ignore to prevent duplicates, or we can overwrite.
+      // Let's overwrite so we can update details.
+      const others = prev.filter(v => v.name.toLowerCase() !== visitor.name.toLowerCase());
+      return [...others, visitor];
+    });
+  };
+
   return (
     <VisitorContext.Provider value={{
       visitors,
       logs,
+      uniqueHosts,
+      uniqueVisitors,
       addVisitor,
       checkIn,
       checkOut,
       registerWalkIn,
-      uniqueHosts,
-      uniqueVisitors
+      addSavedHost,
+      addSavedVisitor
     }}>
       {children}
     </VisitorContext.Provider>

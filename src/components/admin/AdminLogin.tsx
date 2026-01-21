@@ -45,7 +45,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full">Logga In</Button>
+            <Button type="submit" className="w-full bg-slate-700 hover:bg-slate-800">Logga In</Button>
           </CardFooter>
         </form>
       </Card>

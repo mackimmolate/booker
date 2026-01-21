@@ -101,7 +101,7 @@ export const AddVisitorForm: React.FC = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit">Spara bokning</Button>
+          <Button type="submit" className="bg-slate-700 hover:bg-slate-800">Spara bokning</Button>
         </CardFooter>
       </form>
     </Card>

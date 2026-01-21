@@ -140,9 +140,10 @@ export const ReceptionPage: React.FC = () => {
                       className="w-full justify-between py-8 text-lg px-6 h-auto"
                       onClick={() => handleCheckIn(v.id, v.name, v.host)}
                     >
-                      <div className="flex flex-col items-start">
-                        <span className="font-bold">{v.name}</span>
-                        <span className="text-muted-foreground text-sm">{v.company} ({t.host}: {v.host})</span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="font-bold text-xl">{v.name}</span>
+                        <span className="text-muted-foreground text-base">{v.company}</span>
+                        <span className="text-muted-foreground text-sm">{t.host}: {v.host}</span>
                       </div>
                     </Button>
                   ))}
@@ -210,9 +211,10 @@ export const ReceptionPage: React.FC = () => {
                       className="w-full justify-between py-8 text-lg px-6 h-auto"
                       onClick={() => handleCheckOut(v.id, v.name)}
                     >
-                      <div className="flex flex-col items-start">
-                        <span className="font-bold">{v.name}</span>
-                        <span className="text-muted-foreground text-sm">{v.company}</span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="font-bold text-xl">{v.name}</span>
+                        <span className="text-muted-foreground text-base">{v.company}</span>
+                        <span className="text-muted-foreground text-sm">{t.host}: {v.host}</span>
                       </div>
                     </Button>
                   ))}
