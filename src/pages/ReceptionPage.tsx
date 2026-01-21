@@ -142,8 +142,8 @@ export const ReceptionPage: React.FC = () => {
                     >
                       <div className="flex flex-col items-start gap-1">
                         <span className="font-bold text-xl">{v.name}</span>
-                        <span className="text-muted-foreground text-base">{v.company}</span>
-                        <span className="text-muted-foreground text-sm">{t.host}: {v.host}</span>
+                        <span className="text-slate-700 text-lg">{v.company}</span>
+                        <span className="text-slate-700 text-lg">{t.host}: {v.host}</span>
                       </div>
                     </Button>
                   ))}
@@ -213,8 +213,8 @@ export const ReceptionPage: React.FC = () => {
                     >
                       <div className="flex flex-col items-start gap-1">
                         <span className="font-bold text-xl">{v.name}</span>
-                        <span className="text-muted-foreground text-base">{v.company}</span>
-                        <span className="text-muted-foreground text-sm">{t.host}: {v.host}</span>
+                        <span className="text-slate-700 text-lg">{v.company}</span>
+                        <span className="text-slate-700 text-lg">{t.host}: {v.host}</span>
                       </div>
                     </Button>
                   ))}
