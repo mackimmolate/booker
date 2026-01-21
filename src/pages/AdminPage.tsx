@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AddVisitorForm } from '../components/admin/AddVisitorForm';
-import { ManageData } from '../components/admin/ManageData';
 import { VisitorList } from '../components/admin/VisitorList';
 import { Button } from '@/components/ui/button';
 
@@ -20,7 +19,6 @@ export const AdminPage: React.FC = () => {
       </div>
 
       <AddVisitorForm />
-      <ManageData />
       <VisitorList />
     </div>
   );

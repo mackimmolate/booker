@@ -26,20 +26,37 @@ export interface LogEntry {
 }
 
 export interface SavedVisitor {
+  id: string;
   name: string;
   company: string;
   email: string;
 }
 
+export interface SavedHost {
+  id: string;
+  name: string;
+  email?: string;
+}
+
 export interface VisitorContextType {
   visitors: Visitor[];
   logs: LogEntry[];
-  uniqueHosts: string[];
+  uniqueHosts: SavedHost[];
   uniqueVisitors: SavedVisitor[];
+
   addVisitor: (visitor: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked'>) => void;
   checkIn: (visitorId: string, details?: Partial<Visitor>) => void;
   checkOut: (visitorId: string) => void;
   registerWalkIn: (visitor: Omit<Visitor, 'id' | 'status' | 'preBooked'>) => void;
-  addSavedHost: (name: string) => void;
-  addSavedVisitor: (visitor: SavedVisitor) => void;
+
+  // Data Management
+  savedHosts: SavedHost[];
+  savedVisitors: SavedVisitor[];
+  addSavedHost: (host: Omit<SavedHost, 'id'>) => void;
+  updateSavedHost: (id: string, host: Partial<SavedHost>) => void;
+  deleteSavedHost: (id: string) => void;
+
+  addSavedVisitor: (visitor: Omit<SavedVisitor, 'id'>) => void;
+  updateSavedVisitor: (id: string, visitor: Partial<SavedVisitor>) => void;
+  deleteSavedVisitor: (id: string) => void;
 }

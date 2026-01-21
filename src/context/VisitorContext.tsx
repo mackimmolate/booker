@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor } from '../types';
+import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor, type SavedHost } from '../types';
 
 const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
 
@@ -29,10 +29,15 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   });
 
-  const [savedHosts, setSavedHosts] = useState<string[]>(() => {
+  const [savedHosts, setSavedHosts] = useState<SavedHost[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SAVED_HOSTS);
-      return stored ? JSON.parse(stored) : [];
+      // Migration from old string array to object array if needed
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (parsed.length > 0 && typeof parsed[0] === 'string') {
+          return parsed.map((name: string) => ({ id: crypto.randomUUID(), name }));
+      }
+      return parsed;
     } catch (e) {
       console.error("Failed to load saved hosts from local storage", e);
       return [];
@@ -66,22 +71,9 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem(STORAGE_KEY_SAVED_VISITORS, JSON.stringify(savedVisitors));
   }, [savedVisitors]);
 
-  // Derived state for autocomplete
-  const uniqueHosts = Array.from(new Set([
-    ...savedHosts,
-    ...visitors.map(v => v.host).filter(Boolean)
-  ])).sort();
-
-  const uniqueVisitors = Object.values(
-    [...savedVisitors, ...visitors.map(v => ({ name: v.name, company: v.company, email: v.email || '' }))]
-      .reduce((acc, v) => {
-        if (!acc[v.name]) {
-          acc[v.name] = v;
-        }
-        return acc;
-      }, {} as Record<string, SavedVisitor>)
-  ).sort((a, b) => a.name.localeCompare(b.name));
-
+  // Derived state for lists
+  const uniqueHosts = savedHosts.sort((a, b) => a.name.localeCompare(b.name));
+  const uniqueVisitors = savedVisitors.sort((a, b) => a.name.localeCompare(b.name));
 
   const addLog = (visitor: Visitor, action: LogEntry['action']) => {
     const newLog: LogEntry = {
@@ -96,6 +88,38 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     setLogs(prev => [newLog, ...prev]);
   };
 
+  const addSavedHost = (host: Omit<SavedHost, 'id'>) => {
+    setSavedHosts(prev => {
+      // Avoid duplicates by name
+      if (prev.some(h => h.name.toLowerCase() === host.name.toLowerCase())) return prev;
+      return [...prev, { ...host, id: crypto.randomUUID() }];
+    });
+  };
+
+  const updateSavedHost = (id: string, updates: Partial<SavedHost>) => {
+    setSavedHosts(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+  };
+
+  const deleteSavedHost = (id: string) => {
+    setSavedHosts(prev => prev.filter(h => h.id !== id));
+  };
+
+  const addSavedVisitor = (visitor: Omit<SavedVisitor, 'id'>) => {
+    setSavedVisitors(prev => {
+      // Avoid duplicates by name
+      if (prev.some(v => v.name.toLowerCase() === visitor.name.toLowerCase())) return prev;
+      return [...prev, { ...visitor, id: crypto.randomUUID() }];
+    });
+  };
+
+  const updateSavedVisitor = (id: string, updates: Partial<SavedVisitor>) => {
+    setSavedVisitors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+  };
+
+  const deleteSavedVisitor = (id: string) => {
+    setSavedVisitors(prev => prev.filter(v => v.id !== id));
+  };
+
   const addVisitor = (data: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked'>) => {
     const newVisitor: Visitor = {
       ...data,
@@ -106,6 +130,16 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     setVisitors(prev => [...prev, newVisitor]);
     addLog(newVisitor, 'registered');
+
+    // Auto-save new host if not exists
+    if (!savedHosts.some(h => h.name.toLowerCase() === data.host.toLowerCase())) {
+        addSavedHost({ name: data.host });
+    }
+
+    // Auto-save new visitor if not exists
+    if (!savedVisitors.some(v => v.name.toLowerCase() === data.name.toLowerCase())) {
+        addSavedVisitor({ name: data.name, company: data.company, email: data.email || '' });
+    }
   };
 
   const registerWalkIn = (data: Omit<Visitor, 'id' | 'status' | 'preBooked'>) => {
@@ -118,6 +152,14 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     setVisitors(prev => [...prev, newVisitor]);
     addLog(newVisitor, 'check-in');
+
+    // Auto-save host and visitor on walk-in too? Probably yes.
+    if (!savedHosts.some(h => h.name.toLowerCase() === data.host.toLowerCase())) {
+        addSavedHost({ name: data.host });
+    }
+    if (!savedVisitors.some(v => v.name.toLowerCase() === data.name.toLowerCase())) {
+        addSavedVisitor({ name: data.name, company: data.company, email: data.email || '' });
+    }
   };
 
   const checkIn = (visitorId: string, details?: Partial<Visitor>) => {
@@ -161,22 +203,6 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const addSavedHost = (name: string) => {
-    setSavedHosts(prev => {
-      if (prev.includes(name)) return prev;
-      return [...prev, name];
-    });
-  };
-
-  const addSavedVisitor = (visitor: SavedVisitor) => {
-    setSavedVisitors(prev => {
-      // Check if name already exists, if so, maybe update it? Or just ignore.
-      // For now, let's ignore to prevent duplicates, or we can overwrite.
-      // Let's overwrite so we can update details.
-      const others = prev.filter(v => v.name.toLowerCase() !== visitor.name.toLowerCase());
-      return [...others, visitor];
-    });
-  };
 
   return (
     <VisitorContext.Provider value={{
@@ -184,12 +210,21 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       logs,
       uniqueHosts,
       uniqueVisitors,
+      savedHosts,
+      savedVisitors,
+
       addVisitor,
       checkIn,
       checkOut,
       registerWalkIn,
+
       addSavedHost,
-      addSavedVisitor
+      updateSavedHost,
+      deleteSavedHost,
+
+      addSavedVisitor,
+      updateSavedVisitor,
+      deleteSavedVisitor
     }}>
       {children}
     </VisitorContext.Provider>
