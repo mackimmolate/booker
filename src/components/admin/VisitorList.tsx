@@ -22,12 +22,13 @@ export const VisitorList: React.FC = () => {
                 <th className="px-6 py-3">Värd</th>
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3">Incheckad</th>
+                <th className="px-6 py-3">UTCHECKAD</th>
               </tr>
             </thead>
             <tbody>
               {visitors.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">Inga besökare registrerade.</td>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">Inga besökare registrerade.</td>
                 </tr>
               ) : (
                 visitors.slice().reverse().map(visitor => (
@@ -47,6 +48,9 @@ export const VisitorList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       {visitor.checkInTime ? format(new Date(visitor.checkInTime), 'd MMM HH:mm', { locale: sv }) : '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      {visitor.checkOutTime ? format(new Date(visitor.checkOutTime), 'd MMM HH:mm', { locale: sv }) : '-'}
                     </td>
                   </tr>
                 ))

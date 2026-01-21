@@ -79,15 +79,14 @@ export const ReceptionPage: React.FC = () => {
         {view === 'home' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
             <Button
-              className="h-64 text-4xl flex flex-col gap-4 shadow-lg hover:scale-105 transition-transform"
+              className="h-64 text-4xl flex flex-col gap-4 shadow-lg hover:scale-105 transition-transform bg-emerald-600 hover:bg-emerald-700"
               onClick={() => setView('check-in-mode')}
             >
               <CheckCircle size={64} />
               {t.checkIn}
             </Button>
             <Button
-              variant="secondary"
-              className="h-64 text-4xl flex flex-col gap-4 shadow-lg hover:scale-105 transition-transform"
+              className="h-64 text-4xl flex flex-col gap-4 shadow-lg hover:scale-105 transition-transform bg-blue-600 hover:bg-blue-700"
               onClick={() => {
                 setSearchTerm('');
                 setView('check-out');
@@ -143,7 +142,7 @@ export const ReceptionPage: React.FC = () => {
                     >
                       <div className="flex flex-col items-start">
                         <span className="font-bold">{v.name}</span>
-                        <span className="text-muted-foreground text-sm">{v.company}</span>
+                        <span className="text-muted-foreground text-sm">{v.company} ({t.host}: {v.host})</span>
                       </div>
                     </Button>
                   ))}
@@ -231,7 +230,7 @@ export const ReceptionPage: React.FC = () => {
             <div className="flex justify-center mb-6">
               <CheckCircle className="text-green-500 w-32 h-32" />
             </div>
-            <h2 className="text-4xl font-bold mb-4">{t.welcome}</h2>
+            <h2 className="text-4xl font-bold mb-4">{message.includes(t.goodbyeMessage.split('{')[0]) ? t.goodbye : t.welcome}</h2>
             <p className="text-2xl text-gray-600 max-w-md mx-auto">{message}</p>
           </div>
         )}

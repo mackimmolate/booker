@@ -1,6 +1,7 @@
 export const translations = {
   sv: {
     welcome: 'Välkommen',
+    goodbye: 'Hejdå',
     checkIn: 'Checka In',
     checkOut: 'Checka Ut',
     areYouBooked: 'Har du en bokning?',
@@ -24,6 +25,7 @@ export const translations = {
   },
   en: {
     welcome: 'Welcome',
+    goodbye: 'Goodbye',
     checkIn: 'Check In',
     checkOut: 'Check Out',
     areYouBooked: 'Do you have a booking?',
