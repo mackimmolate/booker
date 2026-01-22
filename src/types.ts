@@ -5,7 +5,6 @@ export interface Visitor {
   name: string;
   company: string;
   host: string;
-  email?: string;
   phone?: string;
   preBooked: boolean;
   status: VisitorStatus;
@@ -29,13 +28,11 @@ export interface SavedVisitor {
   id: string;
   name: string;
   company: string;
-  email: string;
 }
 
 export interface SavedHost {
   id: string;
   name: string;
-  email?: string;
 }
 
 export interface VisitorContextType {

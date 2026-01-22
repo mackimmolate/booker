@@ -138,7 +138,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Auto-save new visitor if not exists
     if (!savedVisitors.some(v => v.name.toLowerCase() === data.name.toLowerCase())) {
-        addSavedVisitor({ name: data.name, company: data.company, email: data.email || '' });
+        addSavedVisitor({ name: data.name, company: data.company });
     }
   };
 
@@ -158,7 +158,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
         addSavedHost({ name: data.host });
     }
     if (!savedVisitors.some(v => v.name.toLowerCase() === data.name.toLowerCase())) {
-        addSavedVisitor({ name: data.name, company: data.company, email: data.email || '' });
+        addSavedVisitor({ name: data.name, company: data.company });
     }
   };
 

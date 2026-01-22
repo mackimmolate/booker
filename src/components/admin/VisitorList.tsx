@@ -21,8 +21,8 @@ export const VisitorList: React.FC = () => {
                 <th className="px-6 py-3">Företag</th>
                 <th className="px-6 py-3">Värd</th>
                 <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Incheckad</th>
-                <th className="px-6 py-3">UTCHECKAD</th>
+                <th className="px-6 py-3">Tid</th>
+                <th className="px-6 py-3">Utcheckad</th>
               </tr>
             </thead>
             <tbody>
@@ -47,7 +47,14 @@ export const VisitorList: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {visitor.checkInTime ? format(new Date(visitor.checkInTime), 'd MMM HH:mm', { locale: sv }) : '-'}
+                      {/* Show Expected Arrival if Booked, Check-in Time otherwise */}
+                      {visitor.status === 'booked' && visitor.expectedArrival ? (
+                        <span className="text-gray-500 italic" title="Förväntad ankomst">
+                           Ank: {format(new Date(visitor.expectedArrival), 'd MMM HH:mm', { locale: sv })}
+                        </span>
+                      ) : visitor.checkInTime ? (
+                        format(new Date(visitor.checkInTime), 'd MMM HH:mm', { locale: sv })
+                      ) : '-'}
                     </td>
                     <td className="px-6 py-4">
                       {visitor.checkOutTime ? format(new Date(visitor.checkOutTime), 'd MMM HH:mm', { locale: sv }) : '-'}
