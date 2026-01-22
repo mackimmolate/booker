@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useVisitorContext } from '@/context/VisitorContext';
 import { SavedDataList } from './SavedDataList';
+import { Combobox } from '@/components/ui/combobox';
 
 export const AddVisitorForm: React.FC = () => {
   const { addVisitor, uniqueHosts, uniqueVisitors } = useVisitorContext();
@@ -13,8 +14,7 @@ export const AddVisitorForm: React.FC = () => {
   const [host, setHost] = useState('');
   const [email, setEmail] = useState('');
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
+  const handleNameChange = (newName: string) => {
     setName(newName);
 
     // Auto-fill company/email if known visitor
@@ -53,51 +53,36 @@ export const AddVisitorForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Namn *</Label>
-                <Input
+                <Combobox
                   id="name"
                   required
                   value={name}
                   onChange={handleNameChange}
-                  list="visitor-names"
-                  autoComplete="off"
+                  items={uniqueVisitors.map(v => v.name)}
+                  placeholder="Namn"
                 />
-                <datalist id="visitor-names">
-                  {uniqueVisitors.map((v) => (
-                    <option key={v.id} value={v.name} />
-                  ))}
-                </datalist>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company">Företag *</Label>
-                <Input
+                <Combobox
                   id="company"
                   required
                   value={company}
-                  onChange={e => setCompany(e.target.value)}
-                  list="company-names"
-                  autoComplete="off"
+                  onChange={setCompany}
+                  items={Array.from(new Set(uniqueVisitors.map(v => v.company)))}
+                  placeholder="Företag"
                 />
-                <datalist id="company-names">
-                  {Array.from(new Set(uniqueVisitors.map(v => v.company))).map((c, i) => (
-                    <option key={i} value={c} />
-                  ))}
-                </datalist>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="host">Värd *</Label>
-                <Input
+                <Combobox
                   id="host"
                   required
                   value={host}
-                  onChange={e => setHost(e.target.value)}
-                  list="host-names"
-                  autoComplete="off"
+                  onChange={setHost}
+                  items={uniqueHosts.map(h => h.name)}
+                  placeholder="Värd"
                 />
-                <datalist id="host-names">
-                  {uniqueHosts.map((h) => (
-                    <option key={h.id} value={h.name} />
-                  ))}
-                </datalist>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email (Valfritt)</Label>
