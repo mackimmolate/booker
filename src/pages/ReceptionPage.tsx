@@ -6,13 +6,14 @@ import { Label } from '@/components/ui/label';
 import { useVisitorContext } from '@/context/VisitorContext';
 import { translations, type Language } from '../components/kiosk/translations';
 import { ArrowLeft, CheckCircle, Search } from 'lucide-react';
+import { Combobox } from '@/components/ui/combobox';
 
 export const ReceptionPage: React.FC = () => {
   const [lang, setLang] = useState<Language>('sv');
   const [view, setView] = useState<'home' | 'check-in-mode' | 'check-in-search' | 'check-in-walkin' | 'check-out' | 'success'>('home');
   const [message, setMessage] = useState('');
   const t = translations[lang];
-  const { visitors, checkIn, checkOut, registerWalkIn } = useVisitorContext();
+  const { visitors, checkIn, checkOut, registerWalkIn, uniqueHosts } = useVisitorContext();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({ name: '', company: '', host: '' });
@@ -50,9 +51,23 @@ export const ReceptionPage: React.FC = () => {
     setView('success');
   };
 
-  const filteredVisitors = visitors.filter(v =>
-    v.status === 'booked' && v.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVisitors = visitors.filter(v => {
+    if (v.status !== 'booked') return false;
+
+    // Check if name matches search
+    if (!v.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+
+    // Check if date is today (Local)
+    if (!v.expectedArrival) return false;
+    const bookingDate = new Date(v.expectedArrival);
+    const today = new Date();
+
+    return (
+      bookingDate.getFullYear() === today.getFullYear() &&
+      bookingDate.getMonth() === today.getMonth() &&
+      bookingDate.getDate() === today.getDate()
+    );
+  });
 
   const activeVisitors = visitors.filter(v =>
     v.status === 'checked-in' && v.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -173,7 +188,20 @@ export const ReceptionPage: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="w-host" className="text-lg">{t.host}</Label>
-                  <Input id="w-host" required className="py-6 text-lg" value={formData.host} onChange={e => setFormData({...formData, host: e.target.value})} />
+                  {/* Restricted Host Selection - Using Combobox for consistency but restricted via logic if needed,
+                      or just items prop. User asked for 'only allow host selection from saved hosts'.
+                      The Combobox filters by default. If we want to STRICTLY disallow new ones,
+                      we'd need a Select or validate the input.
+                      Given Kiosk context, a readonly text input with dropdown or strictly Select is safer.
+                      However, simple Combobox populated with saved hosts satisfies 'allow selection'. */}
+                  <Combobox
+                    id="w-host"
+                    required
+                    value={formData.host}
+                    onChange={val => setFormData({...formData, host: val})}
+                    items={uniqueHosts.map(h => h.name)}
+                    placeholder={t.host}
+                  />
                 </div>
               </CardContent>
               <div className="p-6 pt-0 gap-4 flex flex-col">
