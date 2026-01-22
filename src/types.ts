@@ -42,6 +42,7 @@ export interface VisitorContextType {
   uniqueVisitors: SavedVisitor[];
 
   addVisitor: (visitor: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked'>) => void;
+  updateVisitor: (id: string, updates: Partial<Visitor>) => void;
   checkIn: (visitorId: string, details?: Partial<Visitor>) => void;
   checkOut: (visitorId: string) => void;
   registerWalkIn: (visitor: Omit<Visitor, 'id' | 'status' | 'preBooked'>) => void;

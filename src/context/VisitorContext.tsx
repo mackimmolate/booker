@@ -214,6 +214,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       savedVisitors,
 
       addVisitor,
+      updateVisitor: (id, updates) => setVisitors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v)),
       checkIn,
       checkOut,
       registerWalkIn,
