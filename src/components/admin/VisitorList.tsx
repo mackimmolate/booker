@@ -54,33 +54,33 @@ export const VisitorList: React.FC = () => {
         <CardHeader>
           <CardTitle>Besökslista</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-2 sm:p-6">
+          <div className="w-full">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                 <tr>
-                  <th className="px-6 py-3">Namn</th>
-                  <th className="px-6 py-3">Företag</th>
-                  <th className="px-6 py-3">Värd</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Tid</th>
-                  <th className="px-6 py-3">Incheckad</th>
-                  <th className="px-6 py-3">Utcheckad</th>
-                  <th className="px-6 py-3"></th>
+                  <th className="px-4 py-2">Namn</th>
+                  <th className="px-4 py-2">Företag</th>
+                  <th className="px-4 py-2">Värd</th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Tid</th>
+                  <th className="px-4 py-2">Incheckad</th>
+                  <th className="px-4 py-2">Utcheckad</th>
+                  <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {visitors.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-4 text-center text-gray-500">Inga besökare registrerade.</td>
+                    <td colSpan={8} className="px-4 py-4 text-center text-gray-500">Inga besökare registrerade.</td>
                   </tr>
                 ) : (
                   visitors.slice().reverse().map(visitor => (
                     <tr key={visitor.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{visitor.name}</td>
-                      <td className="px-6 py-4">{visitor.company}</td>
-                      <td className="px-6 py-4">{visitor.host}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white">{visitor.name}</td>
+                      <td className="px-4 py-2">{visitor.company}</td>
+                      <td className="px-4 py-2">{visitor.host}</td>
+                      <td className="px-4 py-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           visitor.status === 'checked-in' ? 'bg-green-100 text-green-800' :
                           visitor.status === 'checked-out' ? 'bg-gray-100 text-gray-800' :
@@ -90,16 +90,16 @@ export const VisitorList: React.FC = () => {
                            visitor.status === 'checked-out' ? 'Utcheckad' : 'Bokad'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-2 whitespace-nowrap">
                         {visitor.expectedArrival ? format(new Date(visitor.expectedArrival), 'd MMM HH:mm', { locale: sv }) : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-2 whitespace-nowrap">
                         {visitor.checkInTime ? format(new Date(visitor.checkInTime), 'd MMM HH:mm', { locale: sv }) : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-2 whitespace-nowrap">
                         {visitor.checkOutTime ? format(new Date(visitor.checkOutTime), 'd MMM HH:mm', { locale: sv }) : '-'}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-2 text-right">
                         {visitor.status === 'booked' && (
                           <Button variant="ghost" size="icon" onClick={() => startEdit(visitor)}>
                             <Edit2 size={16} className="text-gray-500 hover:text-blue-600" />
