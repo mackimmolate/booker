@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { ChevronsUpDown } from 'lucide-react';
 
@@ -22,6 +22,10 @@ export const Combobox: React.FC<ComboboxProps> = ({
   const [open, setOpen] = useState(false);
   const [filteredItems, setFilteredItems] = useState<string[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Generate a stable random ID for the name attribute to confuse autofill
+  // We use useMemo so it doesn't change on every render (which would cause focus loss)
+  const randomName = useMemo(() => `field_${Math.random().toString(36).substring(2, 10)}`, []);
 
   // Filter items based on input
   useEffect(() => {
@@ -65,9 +69,15 @@ export const Combobox: React.FC<ComboboxProps> = ({
           placeholder={placeholder}
           required={required}
           className="pr-10"
-          autoComplete="off"
-          // Using a random name attribute sometimes helps confusing browsers too
-          name={`${id}_custom_search_${Math.random().toString(36).substring(7)}`}
+
+          /* AGGRESSIVE AUTOCOMPLETE DISABLE */
+          autoComplete="new-password" // Often forces browsers to stop suggesting history
+          name={randomName} // Random name prevents linking to address book
+          data-lpignore="true" // Ignore LastPass
+          data-form-type="other" // Generic hint
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
         />
         <button
           type="button"
