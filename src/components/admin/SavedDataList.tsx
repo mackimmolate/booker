@@ -59,7 +59,7 @@ export const SavedDataList: React.FC = () => {
       {/* Saved Hosts */}
       <Card>
         <CardHeader>
-          <CardTitle>Sparade Värdar</CardTitle>
+          <CardTitle>Sparade värdar</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 max-h-96 overflow-y-auto">
           {savedHosts.length === 0 ? (
@@ -103,7 +103,7 @@ export const SavedDataList: React.FC = () => {
       {/* Saved Visitors */}
       <Card>
         <CardHeader>
-          <CardTitle>Sparade Besökare</CardTitle>
+          <CardTitle>Sparade besökare</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 max-h-96 overflow-y-auto">
           {savedVisitors.length === 0 ? (
