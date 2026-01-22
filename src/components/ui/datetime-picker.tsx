@@ -39,7 +39,6 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, value, on
 
   const updateISO = (d: string, h: string, m: string) => {
     if (!d) return; // Wait for date
-    const iso = `${d}T${h}:${m}:00.000`; // Simple construction
     // Could add timezone handling here if needed, but keeping it local-iso-like for now
     // Actually, let's create a Date object to get proper ISO string with timezone or just use local string
     // The app uses new Date().toISOString() elsewhere which is UTC.
