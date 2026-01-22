@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { useVisitorContext } from '@/context/VisitorContext';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-import { Edit2, Save, X } from 'lucide-react';
+import { Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Combobox } from '@/components/ui/combobox';
