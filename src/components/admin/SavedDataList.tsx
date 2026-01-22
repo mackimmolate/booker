@@ -19,7 +19,6 @@ export const SavedDataList: React.FC = () => {
   const [editingVisitor, setEditingVisitor] = useState<string | null>(null);
   const [editVisitorName, setEditVisitorName] = useState('');
   const [editVisitorCompany, setEditVisitorCompany] = useState('');
-  const [editVisitorEmail, setEditVisitorEmail] = useState('');
 
   // Host Actions
   const startEditHost = (id: string, name: string) => {
@@ -38,15 +37,14 @@ export const SavedDataList: React.FC = () => {
   };
 
   // Visitor Actions
-  const startEditVisitor = (id: string, name: string, company: string, email: string) => {
+  const startEditVisitor = (id: string, name: string, company: string) => {
     setEditingVisitor(id);
     setEditVisitorName(name);
     setEditVisitorCompany(company);
-    setEditVisitorEmail(email);
   };
 
   const saveVisitor = (id: string) => {
-    updateSavedVisitor(id, { name: editVisitorName, company: editVisitorCompany, email: editVisitorEmail });
+    updateSavedVisitor(id, { name: editVisitorName, company: editVisitorCompany });
     setEditingVisitor(null);
   };
 
@@ -123,10 +121,6 @@ export const SavedDataList: React.FC = () => {
                         <Input value={editVisitorCompany} onChange={e => setEditVisitorCompany(e.target.value)} className="h-8" />
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Email</Label>
-                      <Input value={editVisitorEmail} onChange={e => setEditVisitorEmail(e.target.value)} className="h-8" />
-                    </div>
                     <div className="flex justify-end gap-2 mt-2">
                       <Button size="sm" variant="ghost" onClick={() => saveVisitor(visitor.id)} className="text-green-600">
                         <Save size={16} className="mr-1" /> Spara
@@ -141,10 +135,9 @@ export const SavedDataList: React.FC = () => {
                     <div>
                       <p className="font-bold">{visitor.name}</p>
                       <p className="text-sm text-gray-600">{visitor.company}</p>
-                      {visitor.email && <p className="text-xs text-gray-500">{visitor.email}</p>}
                     </div>
                     <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => startEditVisitor(visitor.id, visitor.name, visitor.company, visitor.email)} className="h-8 w-8 text-blue-600">
+                      <Button size="icon" variant="ghost" onClick={() => startEditVisitor(visitor.id, visitor.name, visitor.company)} className="h-8 w-8 text-blue-600">
                         <Edit2 size={16} />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => deleteSavedVisitor(visitor.id)} className="h-8 w-8 text-red-600">

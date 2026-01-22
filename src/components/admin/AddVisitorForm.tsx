@@ -1,27 +1,26 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useVisitorContext } from '@/context/VisitorContext';
 import { SavedDataList } from './SavedDataList';
 import { Combobox } from '@/components/ui/combobox';
+import { DateTimePicker } from '@/components/ui/datetime-picker';
 
 export const AddVisitorForm: React.FC = () => {
   const { addVisitor, uniqueHosts, uniqueVisitors } = useVisitorContext();
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [host, setHost] = useState('');
-  const [email, setEmail] = useState('');
+  const [expectedArrival, setExpectedArrival] = useState('');
 
   const handleNameChange = (newName: string) => {
     setName(newName);
 
-    // Auto-fill company/email if known visitor
+    // Auto-fill company if known visitor
     const knownVisitor = uniqueVisitors.find(v => v.name.toLowerCase() === newName.toLowerCase());
     if (knownVisitor) {
       if (!company) setCompany(knownVisitor.company);
-      if (!email) setEmail(knownVisitor.email);
     }
   };
 
@@ -33,13 +32,13 @@ export const AddVisitorForm: React.FC = () => {
       name,
       company,
       host,
-      email,
+      expectedArrival: expectedArrival || new Date().toISOString(),
     });
     // Reset
     setName('');
     setCompany('');
     setHost('');
-    setEmail('');
+    setExpectedArrival('');
   };
 
   return (
@@ -85,8 +84,12 @@ export const AddVisitorForm: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email (Valfritt)</Label>
-                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+                <DateTimePicker
+                  label="Förväntad ankomst"
+                  value={expectedArrival}
+                  onChange={setExpectedArrival}
+                  required
+                />
               </div>
             </div>
           </CardContent>
