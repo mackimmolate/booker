@@ -15,6 +15,9 @@ export default defineConfig({
         name: 'Visitor Management System',
         short_name: 'Booker',
         description: 'Modern Visitor Management & Booking System',
+        display: 'standalone',
+        start_url: '/booker/#/',
+        scope: '/booker/',
         theme_color: '#334155',
         background_color: '#f8fafc',
         icons: [

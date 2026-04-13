@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ComboboxProps {
   items: string[];
@@ -9,6 +10,9 @@ interface ComboboxProps {
   placeholder?: string;
   required?: boolean;
   id?: string;
+  inputClassName?: string;
+  listClassName?: string;
+  itemClassName?: string;
 }
 
 export const Combobox: React.FC<ComboboxProps> = ({
@@ -17,7 +21,10 @@ export const Combobox: React.FC<ComboboxProps> = ({
   onChange,
   placeholder,
   required,
-  id
+  id,
+  inputClassName,
+  listClassName,
+  itemClassName
 }) => {
   const [open, setOpen] = useState(false);
   const [filteredItems, setFilteredItems] = useState<string[]>([]);
@@ -68,7 +75,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
           required={required}
-          className="pr-10"
+          className={cn('pr-10', inputClassName)}
 
           /* AGGRESSIVE AUTOCOMPLETE DISABLE */
           autoComplete="new-password" // Often forces browsers to stop suggesting history
@@ -90,12 +97,12 @@ export const Combobox: React.FC<ComboboxProps> = ({
       </div>
 
       {open && filteredItems.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+        <ul className={cn('absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg', listClassName)}>
           {filteredItems.map((item, index) => (
             <li
               key={index}
               onClick={() => handleSelect(item)}
-              className="px-4 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+              className={cn('cursor-pointer px-4 py-2 text-sm hover:bg-slate-100', itemClassName)}
             >
               {item}
             </li>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor, type SavedHost } from '../types';
+import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor, type SavedHost, type VisitorDataBackup } from '../types';
 
 const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
 
@@ -7,6 +7,7 @@ const STORAGE_KEY_VISITORS = 'vms_visitors';
 const STORAGE_KEY_LOGS = 'vms_logs';
 const STORAGE_KEY_SAVED_HOSTS = 'vms_saved_hosts';
 const STORAGE_KEY_SAVED_VISITORS = 'vms_saved_visitors';
+const BACKUP_VERSION = 1;
 const STORAGE_KEYS = [
   STORAGE_KEY_VISITORS,
   STORAGE_KEY_LOGS,
@@ -24,10 +25,134 @@ const normalizeOptionalText = (value?: string) => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const sanitizeVisitors = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce<Visitor[]>((visitors, entry) => {
+    if (!isRecord(entry)) {
+      return visitors;
+    }
+
+    const status = entry.status;
+    const language = entry.language;
+    const nextVisitor: Visitor = {
+      id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+      name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
+      company: normalizeText(typeof entry.company === 'string' ? entry.company : ''),
+      host: normalizeText(typeof entry.host === 'string' ? entry.host : ''),
+      phone: normalizeOptionalText(typeof entry.phone === 'string' ? entry.phone : undefined),
+      preBooked: typeof entry.preBooked === 'boolean' ? entry.preBooked : true,
+      status: status === 'booked' || status === 'checked-in' || status === 'checked-out' ? status : 'booked',
+      expectedArrival: typeof entry.expectedArrival === 'string' ? entry.expectedArrival : undefined,
+      checkInTime: typeof entry.checkInTime === 'string' ? entry.checkInTime : undefined,
+      checkOutTime: typeof entry.checkOutTime === 'string' ? entry.checkOutTime : undefined,
+      language: language === 'sv' || language === 'en' ? language : 'sv',
+    };
+
+    if (!nextVisitor.name || !nextVisitor.company || !nextVisitor.host) {
+      return visitors;
+    }
+
+    visitors.push(nextVisitor);
+    return visitors;
+  }, []);
+};
+
+const sanitizeLogs = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce<LogEntry[]>((logs, entry) => {
+    if (!isRecord(entry)) {
+      return logs;
+    }
+
+    const action = entry.action;
+    const nextLog: LogEntry = {
+      id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+      visitorId: typeof entry.visitorId === 'string' ? entry.visitorId : '',
+      visitorName: normalizeText(typeof entry.visitorName === 'string' ? entry.visitorName : ''),
+      company: normalizeText(typeof entry.company === 'string' ? entry.company : ''),
+      host: normalizeText(typeof entry.host === 'string' ? entry.host : ''),
+      action: action === 'registered' || action === 'check-in' || action === 'check-out' ? action : 'registered',
+      timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString(),
+    };
+
+    if (!nextLog.visitorId || !nextLog.visitorName || !nextLog.company || !nextLog.host) {
+      return logs;
+    }
+
+    logs.push(nextLog);
+    return logs;
+  }, []);
+};
+
+const sanitizeSavedHosts = (value: unknown) => {
+  const candidateHosts = Array.isArray(value) ? value : [];
+  const seenNames = new Set<string>();
+
+  return candidateHosts.reduce<SavedHost[]>((hosts, entry) => {
+    const nextHost = typeof entry === 'string'
+      ? { id: crypto.randomUUID(), name: normalizeText(entry) }
+      : isRecord(entry)
+        ? {
+            id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+            name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
+          }
+        : null;
+
+    if (!nextHost?.name) {
+      return hosts;
+    }
+
+    const normalizedName = nextHost.name.toLowerCase();
+    if (seenNames.has(normalizedName)) {
+      return hosts;
+    }
+
+    seenNames.add(normalizedName);
+    hosts.push(nextHost);
+    return hosts;
+  }, []);
+};
+
+const sanitizeSavedVisitors = (value: unknown) => {
+  const candidateVisitors = Array.isArray(value) ? value : [];
+  const seenNames = new Set<string>();
+
+  return candidateVisitors.reduce<SavedVisitor[]>((visitors, entry) => {
+    if (!isRecord(entry)) {
+      return visitors;
+    }
+
+    const nextVisitor: SavedVisitor = {
+      id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+      name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
+      company: normalizeText(typeof entry.company === 'string' ? entry.company : ''),
+    };
+
+    if (!nextVisitor.name || !nextVisitor.company) {
+      return visitors;
+    }
+
+    const normalizedName = nextVisitor.name.toLowerCase();
+    if (seenNames.has(normalizedName)) {
+      return visitors;
+    }
+
+    seenNames.add(normalizedName);
+    visitors.push(nextVisitor);
+    return visitors;
+  }, []);
+};
+
 const loadVisitors = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_VISITORS);
-    return stored ? JSON.parse(stored) as Visitor[] : [];
+    return sanitizeVisitors(stored ? JSON.parse(stored) : []);
   } catch (e) {
     console.error('Failed to load visitors from local storage', e);
     return [];
@@ -37,7 +162,7 @@ const loadVisitors = () => {
 const loadLogs = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_LOGS);
-    return stored ? JSON.parse(stored) as LogEntry[] : [];
+    return sanitizeLogs(stored ? JSON.parse(stored) : []);
   } catch (e) {
     console.error('Failed to load logs from local storage', e);
     return [];
@@ -47,33 +172,7 @@ const loadLogs = () => {
 const loadSavedHosts = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_SAVED_HOSTS);
-    const parsed = stored ? JSON.parse(stored) as unknown : [];
-    const candidateHosts = Array.isArray(parsed) ? parsed : [];
-    const seenNames = new Set<string>();
-
-    return candidateHosts.reduce<SavedHost[]>((hosts, entry) => {
-      const nextHost = typeof entry === 'string'
-        ? { id: crypto.randomUUID(), name: normalizeText(entry) }
-        : isRecord(entry)
-          ? {
-              id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
-              name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
-            }
-          : null;
-
-      if (!nextHost?.name) {
-        return hosts;
-      }
-
-      const normalizedName = nextHost.name.toLowerCase();
-      if (seenNames.has(normalizedName)) {
-        return hosts;
-      }
-
-      seenNames.add(normalizedName);
-      hosts.push(nextHost);
-      return hosts;
-    }, []);
+    return sanitizeSavedHosts(stored ? JSON.parse(stored) : []);
   } catch (e) {
     console.error('Failed to load saved hosts from local storage', e);
     return [];
@@ -83,34 +182,7 @@ const loadSavedHosts = () => {
 const loadSavedVisitors = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_SAVED_VISITORS);
-    const parsed = stored ? JSON.parse(stored) as unknown : [];
-    const candidateVisitors = Array.isArray(parsed) ? parsed : [];
-    const seenNames = new Set<string>();
-
-    return candidateVisitors.reduce<SavedVisitor[]>((visitors, entry) => {
-      if (!isRecord(entry)) {
-        return visitors;
-      }
-
-      const nextVisitor: SavedVisitor = {
-        id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
-        name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
-        company: normalizeText(typeof entry.company === 'string' ? entry.company : ''),
-      };
-
-      if (!nextVisitor.name || !nextVisitor.company) {
-        return visitors;
-      }
-
-      const normalizedName = nextVisitor.name.toLowerCase();
-      if (seenNames.has(normalizedName)) {
-        return visitors;
-      }
-
-      seenNames.add(normalizedName);
-      visitors.push(nextVisitor);
-      return visitors;
-    }, []);
+    return sanitizeSavedVisitors(stored ? JSON.parse(stored) : []);
   } catch (e) {
     console.error('Failed to load saved visitors from local storage', e);
     return [];
@@ -392,6 +464,45 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const exportBackup = (): VisitorDataBackup => ({
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    visitors,
+    logs,
+    savedHosts,
+    savedVisitors,
+  });
+
+  const importBackup = (backup: unknown) => {
+    if (!isRecord(backup)) {
+      return { success: false, message: 'Backupfilen har fel format.' };
+    }
+
+    const nextVisitors = sanitizeVisitors(backup.visitors);
+    const nextLogs = sanitizeLogs(backup.logs);
+    const nextSavedHosts = sanitizeSavedHosts(backup.savedHosts);
+    const nextSavedVisitors = sanitizeSavedVisitors(backup.savedVisitors);
+
+    if (
+      !Array.isArray(backup.visitors) ||
+      !Array.isArray(backup.logs) ||
+      !Array.isArray(backup.savedHosts) ||
+      !Array.isArray(backup.savedVisitors)
+    ) {
+      return { success: false, message: 'Backupfilen saknar n\u00f6dv\u00e4ndiga listor.' };
+    }
+
+    setVisitors(nextVisitors);
+    setLogs(nextLogs);
+    setSavedHosts(nextSavedHosts);
+    setSavedVisitors(nextSavedVisitors);
+
+    return {
+      success: true,
+      message: 'Backupen importerades och ersatte den lokala datan.',
+    };
+  };
+
 
   return (
     <VisitorContext.Provider value={{
@@ -414,7 +525,10 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       addSavedVisitor,
       updateSavedVisitor,
-      deleteSavedVisitor
+      deleteSavedVisitor,
+
+      exportBackup,
+      importBackup
     }}>
       {children}
     </VisitorContext.Provider>

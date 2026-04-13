@@ -35,6 +35,15 @@ export interface SavedHost {
   name: string;
 }
 
+export interface VisitorDataBackup {
+  version: number;
+  exportedAt: string;
+  visitors: Visitor[];
+  logs: LogEntry[];
+  savedHosts: SavedHost[];
+  savedVisitors: SavedVisitor[];
+}
+
 export interface VisitorContextType {
   visitors: Visitor[];
   logs: LogEntry[];
@@ -57,4 +66,7 @@ export interface VisitorContextType {
   addSavedVisitor: (visitor: Omit<SavedVisitor, 'id'>) => void;
   updateSavedVisitor: (id: string, visitor: Partial<SavedVisitor>) => void;
   deleteSavedVisitor: (id: string) => void;
+
+  exportBackup: () => VisitorDataBackup;
+  importBackup: (backup: unknown) => { success: boolean; message: string };
 }

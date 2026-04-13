@@ -3,6 +3,7 @@ import { AdminLogin } from '../components/admin/AdminLogin';
 import { AddVisitorForm } from '../components/admin/AddVisitorForm';
 import { VisitorList } from '../components/admin/VisitorList';
 import { ActivityLog } from '../components/admin/ActivityLog';
+import { BackupPanel } from '../components/admin/BackupPanel';
 import { Button } from '@/components/ui/button';
 import {
   hasConfiguredAdminPin,
@@ -57,6 +58,7 @@ export const AdminPage: React.FC = () => {
 
       <AddVisitorForm />
       <VisitorList />
+      <BackupPanel />
       <ActivityLog />
     </div>
   );
