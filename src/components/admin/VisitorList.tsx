@@ -14,7 +14,6 @@ export const VisitorList: React.FC = () => {
   const { visitors, updateVisitor, uniqueHosts, uniqueVisitors } = useVisitorContext();
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Edit State
   const [editName, setEditName] = useState('');
   const [editCompany, setEditCompany] = useState('');
   const [editHost, setEditHost] = useState('');
@@ -50,7 +49,7 @@ export const VisitorList: React.FC = () => {
     <>
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Besökslista</CardTitle>
+          <CardTitle>{'Bes\u00f6kslista'}</CardTitle>
         </CardHeader>
         <CardContent className="p-2 sm:p-6">
           <div className="w-full">
@@ -58,8 +57,8 @@ export const VisitorList: React.FC = () => {
               <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                 <tr>
                   <th className="px-4 py-2">Namn</th>
-                  <th className="px-4 py-2">Företag</th>
-                  <th className="px-4 py-2">Värd</th>
+                  <th className="px-4 py-2">{'F\u00f6retag'}</th>
+                  <th className="px-4 py-2">{'V\u00e4rd'}</th>
                   <th className="px-4 py-2">Status</th>
                   <th className="px-4 py-2">Tid</th>
                   <th className="px-4 py-2">Incheckad</th>
@@ -70,7 +69,9 @@ export const VisitorList: React.FC = () => {
               <tbody>
                 {visitors.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-4 text-center text-gray-500">Inga besökare registrerade.</td>
+                    <td colSpan={8} className="px-4 py-4 text-center text-gray-500">
+                      {'Inga bes\u00f6kare registrerade.'}
+                    </td>
                   </tr>
                 ) : (
                   visitors.slice().reverse().map(visitor => (
@@ -113,7 +114,6 @@ export const VisitorList: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Edit Modal (Simple Fixed Overlay since no Dialog component is guaranteed) */}
       {editingId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in">
           <Card className="w-full max-w-lg bg-white shadow-xl">
@@ -132,7 +132,7 @@ export const VisitorList: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Företag</Label>
+                  <Label>{'F\u00f6retag'}</Label>
                   <Combobox
                     items={uniqueVisitors.map(v => v.company)}
                     value={editCompany}
@@ -141,7 +141,7 @@ export const VisitorList: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Värd</Label>
+                  <Label>{'V\u00e4rd'}</Label>
                   <Combobox
                     items={uniqueHosts.map(h => h.name)}
                     value={editHost}
@@ -150,7 +150,7 @@ export const VisitorList: React.FC = () => {
                   />
                 </div>
                 <DateTimePicker
-                  label="Förväntad ankomst"
+                  label={'F\u00f6rv\u00e4ntad ankomst'}
                   value={editArrival}
                   onChange={setEditArrival}
                 />

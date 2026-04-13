@@ -20,7 +20,6 @@ export const SavedDataList: React.FC = () => {
   const [editVisitorName, setEditVisitorName] = useState('');
   const [editVisitorCompany, setEditVisitorCompany] = useState('');
 
-  // Host Actions
   const startEditHost = (id: string, name: string) => {
     setEditingHost(id);
     setEditHostName(name);
@@ -40,7 +39,6 @@ export const SavedDataList: React.FC = () => {
     setEditHostName('');
   };
 
-  // Visitor Actions
   const startEditVisitor = (id: string, name: string, company: string) => {
     setEditingVisitor(id);
     setEditVisitorName(name);
@@ -62,14 +60,13 @@ export const SavedDataList: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-      {/* Saved Hosts */}
       <Card>
         <CardHeader>
-          <CardTitle>Sparade värdar</CardTitle>
+          <CardTitle>{'Sparade v\u00e4rdar'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 max-h-96 overflow-y-auto">
           {savedHosts.length === 0 ? (
-            <p className="text-sm text-gray-500">Inga sparade värdar.</p>
+            <p className="text-sm text-gray-500">{'Inga sparade v\u00e4rdar.'}</p>
           ) : (
             savedHosts.map(host => (
               <div key={host.id} className="flex items-center justify-between p-2 border rounded-md bg-white">
@@ -106,14 +103,13 @@ export const SavedDataList: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Saved Visitors */}
       <Card>
         <CardHeader>
-          <CardTitle>Sparade besökare</CardTitle>
+          <CardTitle>{'Sparade bes\u00f6kare'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 max-h-96 overflow-y-auto">
           {savedVisitors.length === 0 ? (
-            <p className="text-sm text-gray-500">Inga sparade besökare.</p>
+            <p className="text-sm text-gray-500">{'Inga sparade bes\u00f6kare.'}</p>
           ) : (
             savedVisitors.map(visitor => (
               <div key={visitor.id} className="p-2 border rounded-md bg-white">
@@ -125,7 +121,7 @@ export const SavedDataList: React.FC = () => {
                         <Input value={editVisitorName} onChange={e => setEditVisitorName(e.target.value)} className="h-8" />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Företag</Label>
+                        <Label className="text-xs">{'F\u00f6retag'}</Label>
                         <Input value={editVisitorCompany} onChange={e => setEditVisitorCompany(e.target.value)} className="h-8" />
                       </div>
                     </div>

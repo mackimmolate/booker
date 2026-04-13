@@ -33,12 +33,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ mode, usesManagedPin, on
     try {
       if (isSetupMode) {
         if (usesManagedPin) {
-          setError('Den h\xe4r milj\xf6n anv\xe4nder en f\xf6rkonfigurerad admin-PIN.');
+          setError('Den h\u00e4r milj\u00f6n anv\u00e4nder en f\u00f6rkonfigurerad admin-PIN.');
           return;
         }
 
         if (normalizedPin.length < 4) {
-          setError('PIN-koden beh\xf6ver vara minst 4 tecken.');
+          setError('PIN-koden beh\u00f6ver vara minst 4 tecken.');
           return;
         }
 
@@ -60,7 +60,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ mode, usesManagedPin, on
 
       onSuccess();
     } catch {
-      setError('Det gick inte att hantera PIN-koden i den h\xe4r webbl\xe4saren.');
+      setError('Det gick inte att hantera PIN-koden i den h\u00e4r webbl\u00e4saren.');
     } finally {
       setIsSubmitting(false);
     }
@@ -92,7 +92,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ mode, usesManagedPin, on
             </div>
             {isSetupMode && (
               <div className="space-y-2">
-                <Label htmlFor="confirm-pin">Bekr\xe4fta PIN Kod</Label>
+                <Label htmlFor="confirm-pin">{'Bekr\u00e4fta PIN Kod'}</Label>
                 <Input
                   id="confirm-pin"
                   type="password"
@@ -108,10 +108,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ mode, usesManagedPin, on
             )}
             <p className="text-sm text-gray-600">
               {isSetupMode
-                ? 'Den h\xe4r prototypen sparar admin-PIN lokalt i den h\xe4r webbl\xe4saren tills delad autentisering finns p\xe5 plats.'
+                ? 'Den h\u00e4r prototypen sparar admin-PIN lokalt i den h\u00e4r webbl\u00e4saren tills delad autentisering finns p\u00e5 plats.'
                 : usesManagedPin
-                  ? 'Anv\xe4nd admin-PIN som \xe4r konfigurerad f\xf6r den h\xe4r milj\xf6n.'
-                  : 'Anv\xe4nd admin-PIN som tidigare sparats i den h\xe4r webbl\xe4saren.'}
+                  ? 'Anv\u00e4nd admin-PIN som \u00e4r konfigurerad f\u00f6r den h\u00e4r milj\u00f6n.'
+                  : 'Anv\u00e4nd admin-PIN som tidigare sparats i den h\u00e4r webbl\u00e4saren.'}
             </p>
             {error && <p className="text-sm text-red-500">{error}</p>}
           </CardContent>

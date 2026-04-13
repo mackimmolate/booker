@@ -18,7 +18,6 @@ export const AddVisitorForm: React.FC = () => {
   const handleNameChange = (newName: string) => {
     setName(newName);
 
-    // Auto-fill company if known visitor
     const knownVisitor = uniqueVisitors.find(v => v.name.toLowerCase() === newName.toLowerCase());
     if (knownVisitor) {
       setCompany(knownVisitor.company);
@@ -35,7 +34,7 @@ export const AddVisitorForm: React.FC = () => {
       host,
       expectedArrival,
     });
-    // Reset
+
     setName('');
     setCompany('');
     setHost('');
@@ -46,7 +45,7 @@ export const AddVisitorForm: React.FC = () => {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Boka besök</CardTitle>
+          <CardTitle>{'Boka bes\u00f6k'}</CardTitle>
         </CardHeader>
         <form onSubmit={handleSubmit} autoComplete="off">
           <CardContent className="space-y-4">
@@ -63,30 +62,30 @@ export const AddVisitorForm: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="company">Företag *</Label>
+                <Label htmlFor="company">{'F\u00f6retag *'}</Label>
                 <Combobox
                   id="company"
                   required
                   value={company}
                   onChange={setCompany}
                   items={Array.from(new Set(uniqueVisitors.map(v => v.company)))}
-                  placeholder="Företag"
+                  placeholder={'F\u00f6retag'}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="host">Värd *</Label>
+                <Label htmlFor="host">{'V\u00e4rd *'}</Label>
                 <Combobox
                   id="host"
                   required
                   value={host}
                   onChange={setHost}
                   items={uniqueHosts.map(h => h.name)}
-                  placeholder="Värd"
+                  placeholder={'V\u00e4rd'}
                 />
               </div>
               <div className="space-y-2">
                 <DateTimePicker
-                  label="Förväntad ankomst"
+                  label={'F\u00f6rv\u00e4ntad ankomst'}
                   value={expectedArrival}
                   onChange={setExpectedArrival}
                   required

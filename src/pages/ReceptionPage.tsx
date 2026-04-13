@@ -84,10 +84,10 @@ export const ReceptionPage: React.FC = () => {
         <h1 className="text-xl font-bold tracking-tight">Visitor Kiosk</h1>
         <div className="flex gap-2">
           <Button variant={lang === 'sv' ? 'default' : 'outline'} onClick={() => setLang('sv')} size="sm">
-            🇸🇪 SV
+            SV
           </Button>
           <Button variant={lang === 'en' ? 'default' : 'outline'} onClick={() => setLang('en')} size="sm">
-            🇬🇧 EN
+            EN
           </Button>
         </div>
       </header>

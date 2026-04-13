@@ -20,7 +20,7 @@ export const ActivityLog: React.FC = () => {
       </CardHeader>
       <CardContent className="space-y-3">
         {logs.length === 0 ? (
-          <p className="text-sm text-gray-500">Inga loggar registrerade \xe4n.</p>
+          <p className="text-sm text-gray-500">{'Inga loggar registrerade \u00e4n.'}</p>
         ) : (
           logs.map(log => (
             <div
