@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { useVisitorContext } from '@/context/VisitorContext';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
@@ -9,6 +10,7 @@ import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Combobox } from '@/components/ui/combobox';
 import { Label } from '@/components/ui/label';
 import { type Visitor } from '@/types';
+import { NotificationStatusBadge } from './NotificationStatusBadge';
 
 export const VisitorList: React.FC = () => {
   const { visitors, updateVisitor, uniqueHosts, uniqueVisitors } = useVisitorContext();
@@ -17,6 +19,7 @@ export const VisitorList: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editCompany, setEditCompany] = useState('');
   const [editHost, setEditHost] = useState('');
+  const [editHostEmail, setEditHostEmail] = useState('');
   const [editArrival, setEditArrival] = useState('');
 
   const startEdit = (visitor: Visitor) => {
@@ -24,11 +27,19 @@ export const VisitorList: React.FC = () => {
     setEditName(visitor.name);
     setEditCompany(visitor.company);
     setEditHost(visitor.host);
+    setEditHostEmail(visitor.hostEmail || '');
     setEditArrival(visitor.expectedArrival || '');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+  };
+
+  const handleHostChange = (newHost: string) => {
+    setEditHost(newHost);
+
+    const knownHost = uniqueHosts.find(host => host.name.toLowerCase() === newHost.toLowerCase());
+    setEditHostEmail(knownHost?.email ?? '');
   };
 
   const saveEdit = () => {
@@ -40,7 +51,8 @@ export const VisitorList: React.FC = () => {
       name: editName,
       company: editCompany,
       host: editHost,
-      expectedArrival: editArrival
+      hostEmail: editHostEmail,
+      expectedArrival: editArrival,
     });
     setEditingId(null);
   };
@@ -52,14 +64,15 @@ export const VisitorList: React.FC = () => {
           <CardTitle>{'Bes\u00f6kslista'}</CardTitle>
         </CardHeader>
         <CardContent className="p-2 sm:p-6">
-          <div className="w-full">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-700 dark:bg-gray-700 dark:text-gray-400">
                 <tr>
                   <th className="px-4 py-2">Namn</th>
                   <th className="px-4 py-2">{'F\u00f6retag'}</th>
                   <th className="px-4 py-2">{'V\u00e4rd'}</th>
                   <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Notifiering</th>
                   <th className="px-4 py-2">Tid</th>
                   <th className="px-4 py-2">Incheckad</th>
                   <th className="px-4 py-2">Utcheckad</th>
@@ -69,18 +82,25 @@ export const VisitorList: React.FC = () => {
               <tbody>
                 {visitors.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-4 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-4 text-center text-gray-500">
                       {'Inga bes\u00f6kare registrerade.'}
                     </td>
                   </tr>
                 ) : (
                   visitors.slice().reverse().map(visitor => (
-                    <tr key={visitor.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                      <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white">{visitor.name}</td>
+                    <tr key={visitor.id} className="border-b bg-white dark:border-gray-700 dark:bg-gray-800">
+                      <td className="whitespace-nowrap px-4 py-2 font-medium text-gray-900 dark:text-white">
+                        {visitor.name}
+                      </td>
                       <td className="px-4 py-2">{visitor.company}</td>
-                      <td className="px-4 py-2">{visitor.host}</td>
                       <td className="px-4 py-2">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
+                        <div className="min-w-44">
+                          <p>{visitor.host}</p>
+                          <p className="text-xs text-slate-500">{visitor.hostEmail || 'Ingen e-post sparad'}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`rounded-full px-2 py-1 text-xs ${
                           visitor.status === 'checked-in' ? 'bg-green-100 text-green-800' :
                           visitor.status === 'checked-out' ? 'bg-gray-100 text-gray-800' :
                           'bg-blue-100 text-blue-800'
@@ -89,13 +109,25 @@ export const VisitorList: React.FC = () => {
                            visitor.status === 'checked-out' ? 'Utcheckad' : 'Bokad'}
                         </span>
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-2">
+                        {visitor.status === 'checked-in' ? (
+                          <div className="flex min-w-40 flex-col gap-1">
+                            <NotificationStatusBadge status={visitor.notificationStatus} />
+                            {visitor.notificationError && (
+                              <p className="text-xs text-rose-600">{visitor.notificationError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-slate-400">V\u00e4ntar p\u00e5 incheckning</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2">
                         {visitor.expectedArrival ? format(new Date(visitor.expectedArrival), 'd MMM HH:mm', { locale: sv }) : '-'}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-2">
                         {visitor.checkInTime ? format(new Date(visitor.checkInTime), 'd MMM HH:mm', { locale: sv }) : '-'}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-2">
                         {visitor.checkOutTime ? format(new Date(visitor.checkOutTime), 'd MMM HH:mm', { locale: sv }) : '-'}
                       </td>
                       <td className="px-4 py-2 text-right">
@@ -115,7 +147,7 @@ export const VisitorList: React.FC = () => {
       </Card>
 
       {editingId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in">
           <Card className="w-full max-w-lg bg-white shadow-xl">
             <CardHeader>
               <CardTitle>Redigera Bokning</CardTitle>
@@ -145,8 +177,17 @@ export const VisitorList: React.FC = () => {
                   <Combobox
                     items={uniqueHosts.map(h => h.name)}
                     value={editHost}
-                    onChange={setEditHost}
+                    onChange={handleHostChange}
                     id="edit-host"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{'V\u00e4rdens e-post'}</Label>
+                  <Input
+                    type="email"
+                    value={editHostEmail}
+                    onChange={e => setEditHostEmail(e.target.value)}
+                    placeholder="vard@foretag.se"
                   />
                 </div>
                 <DateTimePicker

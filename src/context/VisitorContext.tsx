@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor, type SavedHost, type VisitorDataBackup } from '../types';
+import {
+  type LogEntry,
+  type NotificationStatus,
+  type SavedHost,
+  type SavedVisitor,
+  type Visitor,
+  type VisitorContextType,
+  type VisitorDataBackup,
+  type VisitorStatus,
+} from '../types';
+import { isHostNotificationConfigured, sendHostNotification } from '@/lib/host-notifications';
 
 const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
 
@@ -22,6 +32,24 @@ const normalizeOptionalText = (value?: string) => {
   return normalizedValue || undefined;
 };
 
+const normalizeEmail = (value?: string) => {
+  const normalizedValue = value?.trim().toLowerCase() ?? '';
+  return normalizedValue || undefined;
+};
+
+const normalizeNotificationStatus = (value: unknown): NotificationStatus | undefined => {
+  switch (value) {
+    case 'not-configured':
+    case 'pending':
+    case 'sent':
+    case 'failed':
+    case 'skipped':
+      return value;
+    default:
+      return undefined;
+  }
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -42,12 +70,18 @@ const sanitizeVisitors = (value: unknown) => {
       name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
       company: normalizeText(typeof entry.company === 'string' ? entry.company : ''),
       host: normalizeText(typeof entry.host === 'string' ? entry.host : ''),
+      hostEmail: normalizeEmail(typeof entry.hostEmail === 'string' ? entry.hostEmail : undefined),
       phone: normalizeOptionalText(typeof entry.phone === 'string' ? entry.phone : undefined),
       preBooked: typeof entry.preBooked === 'boolean' ? entry.preBooked : true,
       status: status === 'booked' || status === 'checked-in' || status === 'checked-out' ? status : 'booked',
       expectedArrival: typeof entry.expectedArrival === 'string' ? entry.expectedArrival : undefined,
       checkInTime: typeof entry.checkInTime === 'string' ? entry.checkInTime : undefined,
       checkOutTime: typeof entry.checkOutTime === 'string' ? entry.checkOutTime : undefined,
+      notificationStatus: normalizeNotificationStatus(entry.notificationStatus),
+      notificationChannel: entry.notificationChannel === 'email' ? 'email' : undefined,
+      notificationAttemptedAt: typeof entry.notificationAttemptedAt === 'string' ? entry.notificationAttemptedAt : undefined,
+      notificationSentAt: typeof entry.notificationSentAt === 'string' ? entry.notificationSentAt : undefined,
+      notificationError: normalizeOptionalText(typeof entry.notificationError === 'string' ? entry.notificationError : undefined),
       language: language === 'sv' || language === 'en' ? language : 'sv',
     };
 
@@ -79,6 +113,8 @@ const sanitizeLogs = (value: unknown) => {
       host: normalizeText(typeof entry.host === 'string' ? entry.host : ''),
       action: action === 'registered' || action === 'check-in' || action === 'check-out' ? action : 'registered',
       timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString(),
+      notificationStatus: normalizeNotificationStatus(entry.notificationStatus),
+      notificationRecipient: normalizeEmail(typeof entry.notificationRecipient === 'string' ? entry.notificationRecipient : undefined),
     };
 
     if (!nextLog.visitorId || !nextLog.visitorName || !nextLog.company || !nextLog.host) {
@@ -92,15 +128,16 @@ const sanitizeLogs = (value: unknown) => {
 
 const sanitizeSavedHosts = (value: unknown) => {
   const candidateHosts = Array.isArray(value) ? value : [];
-  const seenNames = new Set<string>();
+  const seenNames = new Map<string, number>();
 
   return candidateHosts.reduce<SavedHost[]>((hosts, entry) => {
     const nextHost = typeof entry === 'string'
-      ? { id: crypto.randomUUID(), name: normalizeText(entry) }
+      ? { id: crypto.randomUUID(), name: normalizeText(entry), email: undefined }
       : isRecord(entry)
         ? {
             id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
             name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
+            email: normalizeEmail(typeof entry.email === 'string' ? entry.email : undefined),
           }
         : null;
 
@@ -109,11 +146,16 @@ const sanitizeSavedHosts = (value: unknown) => {
     }
 
     const normalizedName = nextHost.name.toLowerCase();
-    if (seenNames.has(normalizedName)) {
+    const existingIndex = seenNames.get(normalizedName);
+
+    if (existingIndex !== undefined) {
+      if (!hosts[existingIndex].email && nextHost.email) {
+        hosts[existingIndex] = { ...hosts[existingIndex], email: nextHost.email };
+      }
       return hosts;
     }
 
-    seenNames.add(normalizedName);
+    seenNames.set(normalizedName, hosts.length);
     hosts.push(nextHost);
     return hosts;
   }, []);
@@ -195,7 +237,6 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [savedHosts, setSavedHosts] = useState<SavedHost[]>(loadSavedHosts);
   const [savedVisitors, setSavedVisitors] = useState<SavedVisitor[]>(loadSavedVisitors);
 
-  // Save to local storage whenever state changes
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_VISITORS, JSON.stringify(visitors));
   }, [visitors]);
@@ -244,6 +285,14 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     [savedVisitors]
   );
 
+  const findSavedHostByName = (hostName: string) => {
+    const normalizedHostName = normalizeText(hostName).toLowerCase();
+    return savedHosts.find(host => host.name.toLowerCase() === normalizedHostName);
+  };
+
+  const resolveHostEmail = (hostName: string, explicitEmail?: string) =>
+    normalizeEmail(explicitEmail) ?? findSavedHostByName(hostName)?.email;
+
   const addLog = (visitor: Visitor, action: LogEntry['action']) => {
     const newLog: LogEntry = {
       id: crypto.randomUUID(),
@@ -253,22 +302,75 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       host: visitor.host,
       action,
       timestamp: new Date().toISOString(),
+      notificationStatus: visitor.notificationStatus,
+      notificationRecipient: visitor.hostEmail,
     };
     setLogs(prev => [newLog, ...prev]);
   };
 
+  const updateNotificationTracking = (
+    visitorId: string,
+    updates: Pick<
+      Visitor,
+      | 'hostEmail'
+      | 'notificationStatus'
+      | 'notificationChannel'
+      | 'notificationAttemptedAt'
+      | 'notificationSentAt'
+      | 'notificationError'
+    >
+  ) => {
+    setVisitors(prev =>
+      prev.map(visitor => (
+        visitor.id === visitorId
+          ? {
+              ...visitor,
+              ...updates,
+            }
+          : visitor
+      ))
+    );
+
+    setLogs(prev => {
+      let updated = false;
+
+      return prev.map(log => {
+        if (updated || log.visitorId !== visitorId || log.action !== 'check-in') {
+          return log;
+        }
+
+        updated = true;
+        return {
+          ...log,
+          notificationStatus: updates.notificationStatus,
+          notificationRecipient: updates.hostEmail,
+        };
+      });
+    });
+  };
+
   const addSavedHost = (host: Omit<SavedHost, 'id'>) => {
     const normalizedName = normalizeText(host.name);
+    const normalizedEmail = normalizeEmail(host.email);
     if (!normalizedName) {
       return;
     }
 
     setSavedHosts(prev => {
-      if (prev.some(existingHost => existingHost.name.toLowerCase() === normalizedName.toLowerCase())) {
+      const existingHost = prev.find(existing => existing.name.toLowerCase() === normalizedName.toLowerCase());
+      if (!existingHost) {
+        return [...prev, { id: crypto.randomUUID(), name: normalizedName, email: normalizedEmail }];
+      }
+
+      if (existingHost.email === normalizedEmail || (!normalizedEmail && existingHost.email)) {
         return prev;
       }
 
-      return [...prev, { id: crypto.randomUUID(), name: normalizedName }];
+      return prev.map(existing =>
+        existing.id === existingHost.id
+          ? { ...existing, email: normalizedEmail }
+          : existing
+      );
     });
   };
 
@@ -280,6 +382,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
 
       const nextName = updates.name === undefined ? currentHost.name : normalizeText(updates.name);
+      const nextEmail = updates.email === undefined ? currentHost.email : normalizeEmail(updates.email);
       if (!nextName) {
         return prev;
       }
@@ -288,7 +391,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
         return prev;
       }
 
-      return prev.map(host => host.id === id ? { ...host, name: nextName } : host);
+      return prev.map(host => host.id === id ? { ...host, name: nextName, email: nextEmail } : host);
     });
   };
 
@@ -340,10 +443,11 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     setSavedVisitors(prev => prev.filter(v => v.id !== id));
   };
 
-  const addVisitor = (data: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked'>) => {
+  const addVisitor = (data: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => {
     const normalizedName = normalizeText(data.name);
     const normalizedCompany = normalizeText(data.company);
     const normalizedHost = normalizeText(data.host);
+    const resolvedHostEmail = resolveHostEmail(normalizedHost, data.hostEmail);
     if (!normalizedName || !normalizedCompany || !normalizedHost) {
       return;
     }
@@ -353,24 +457,27 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       name: normalizedName,
       company: normalizedCompany,
       host: normalizedHost,
+      hostEmail: resolvedHostEmail,
       phone: normalizeOptionalText(data.phone),
       id: crypto.randomUUID(),
       status: 'booked',
-      language: 'sv', // Default
+      language: 'sv',
       preBooked: true,
     };
+
     setVisitors(prev => [...prev, newVisitor]);
     addLog(newVisitor, 'registered');
-    addSavedHost({ name: newVisitor.host });
+    addSavedHost({ name: newVisitor.host, email: newVisitor.hostEmail });
     addSavedVisitor({ name: newVisitor.name, company: newVisitor.company });
   };
 
-  const registerWalkIn = (data: Omit<Visitor, 'id' | 'status' | 'preBooked'>) => {
+  const registerWalkIn = (data: Omit<Visitor, 'id' | 'status' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => {
     const normalizedName = normalizeText(data.name);
     const normalizedCompany = normalizeText(data.company);
     const normalizedHost = normalizeText(data.host);
+    const resolvedHostEmail = resolveHostEmail(normalizedHost, data.hostEmail);
     if (!normalizedName || !normalizedCompany || !normalizedHost) {
-      return;
+      return undefined;
     }
 
     const newVisitor: Visitor = {
@@ -378,90 +485,188 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       name: normalizedName,
       company: normalizedCompany,
       host: normalizedHost,
+      hostEmail: resolvedHostEmail,
       phone: normalizeOptionalText(data.phone),
       id: crypto.randomUUID(),
       status: 'checked-in',
       preBooked: false,
       checkInTime: new Date().toISOString(),
+      notificationStatus: undefined,
+      notificationChannel: undefined,
+      notificationAttemptedAt: undefined,
+      notificationSentAt: undefined,
+      notificationError: undefined,
     };
+
     setVisitors(prev => [...prev, newVisitor]);
     addLog(newVisitor, 'check-in');
-    addSavedHost({ name: newVisitor.host });
+    addSavedHost({ name: newVisitor.host, email: newVisitor.hostEmail });
     addSavedVisitor({ name: newVisitor.name, company: newVisitor.company });
+
+    return newVisitor;
   };
 
   const checkIn = (visitorId: string, details?: Partial<Visitor>) => {
-    let updatedVisitor: Visitor | undefined;
-
-    setVisitors(prev => prev.map(v => {
-      if (v.id === visitorId) {
-        updatedVisitor = {
-          ...v,
-          ...details,
-          status: 'checked-in' as VisitorStatus,
-          checkInTime: new Date().toISOString(),
-        };
-        return updatedVisitor;
-      }
-      return v;
-    }));
-
-    if (updatedVisitor) {
-      addLog(updatedVisitor, 'check-in');
+    const currentVisitor = visitors.find(visitor => visitor.id === visitorId);
+    if (!currentVisitor) {
+      return undefined;
     }
+
+    const nextHost = details?.host === undefined ? currentVisitor.host : normalizeText(details.host);
+    const nextHostEmail = details?.hostEmail === undefined
+      ? resolveHostEmail(nextHost, currentVisitor.hostEmail)
+      : resolveHostEmail(nextHost, details.hostEmail);
+    const updatedVisitor: Visitor = {
+      ...currentVisitor,
+      ...details,
+      host: nextHost,
+      hostEmail: nextHostEmail,
+      status: 'checked-in' as VisitorStatus,
+      checkInTime: new Date().toISOString(),
+      notificationStatus: undefined,
+      notificationChannel: undefined,
+      notificationAttemptedAt: undefined,
+      notificationSentAt: undefined,
+      notificationError: undefined,
+    };
+
+    setVisitors(prev => prev.map(visitor => (
+      visitor.id === visitorId ? updatedVisitor : visitor
+    )));
+
+    addLog(updatedVisitor, 'check-in');
+    addSavedHost({ name: updatedVisitor.host, email: updatedVisitor.hostEmail });
+    addSavedVisitor({ name: updatedVisitor.name, company: updatedVisitor.company });
+
+    return updatedVisitor;
   };
 
   const checkOut = (visitorId: string) => {
-    let updatedVisitor: Visitor | undefined;
-
-    setVisitors(prev => prev.map(v => {
-      if (v.id === visitorId) {
-        updatedVisitor = {
-          ...v,
-          status: 'checked-out' as VisitorStatus,
-          checkOutTime: new Date().toISOString(),
-        };
-        return updatedVisitor;
-      }
-      return v;
-    }));
-
-    if (updatedVisitor) {
-      addLog(updatedVisitor, 'check-out');
+    const currentVisitor = visitors.find(visitor => visitor.id === visitorId);
+    if (!currentVisitor) {
+      return;
     }
+
+    const updatedVisitor: Visitor = {
+      ...currentVisitor,
+      status: 'checked-out' as VisitorStatus,
+      checkOutTime: new Date().toISOString(),
+    };
+
+    setVisitors(prev => prev.map(visitor => (
+      visitor.id === visitorId ? updatedVisitor : visitor
+    )));
+    addLog(updatedVisitor, 'check-out');
   };
 
   const updateVisitor = (id: string, updates: Partial<Visitor>) => {
-    let updatedVisitor: Visitor | undefined;
-
-    setVisitors(prev => prev.map(visitor => {
-      if (visitor.id !== id) {
-        return visitor;
-      }
-
-      const nextName = updates.name === undefined ? visitor.name : normalizeText(updates.name);
-      const nextCompany = updates.company === undefined ? visitor.company : normalizeText(updates.company);
-      const nextHost = updates.host === undefined ? visitor.host : normalizeText(updates.host);
-      if (!nextName || !nextCompany || !nextHost) {
-        return visitor;
-      }
-
-      updatedVisitor = {
-        ...visitor,
-        ...updates,
-        name: nextName,
-        company: nextCompany,
-        host: nextHost,
-        phone: updates.phone === undefined ? visitor.phone : normalizeOptionalText(updates.phone),
-      };
-
-      return updatedVisitor;
-    }));
-
-    if (updatedVisitor) {
-      addSavedHost({ name: updatedVisitor.host });
-      addSavedVisitor({ name: updatedVisitor.name, company: updatedVisitor.company });
+    const currentVisitor = visitors.find(visitor => visitor.id === id);
+    if (!currentVisitor) {
+      return;
     }
+
+    const nextName = updates.name === undefined ? currentVisitor.name : normalizeText(updates.name);
+    const nextCompany = updates.company === undefined ? currentVisitor.company : normalizeText(updates.company);
+    const nextHost = updates.host === undefined ? currentVisitor.host : normalizeText(updates.host);
+    if (!nextName || !nextCompany || !nextHost) {
+      return;
+    }
+
+    const nextHostEmail = updates.hostEmail === undefined
+      ? (nextHost.toLowerCase() === currentVisitor.host.toLowerCase()
+        ? resolveHostEmail(nextHost, currentVisitor.hostEmail)
+        : resolveHostEmail(nextHost))
+      : resolveHostEmail(nextHost, updates.hostEmail);
+
+    const updatedVisitor: Visitor = {
+      ...currentVisitor,
+      ...updates,
+      name: nextName,
+      company: nextCompany,
+      host: nextHost,
+      hostEmail: nextHostEmail,
+      phone: updates.phone === undefined ? currentVisitor.phone : normalizeOptionalText(updates.phone),
+      notificationError: updates.notificationError === undefined
+        ? currentVisitor.notificationError
+        : normalizeOptionalText(updates.notificationError),
+    };
+
+    setVisitors(prev => prev.map(visitor => (
+      visitor.id === id ? updatedVisitor : visitor
+    )));
+    addSavedHost({ name: updatedVisitor.host, email: updatedVisitor.hostEmail });
+    addSavedVisitor({ name: updatedVisitor.name, company: updatedVisitor.company });
+  };
+
+  const notifyHost: VisitorContextType['notifyHost'] = async (visitor) => {
+    const attemptedAt = new Date().toISOString();
+    const hostEmail = resolveHostEmail(visitor.host, visitor.hostEmail);
+
+    if (!hostEmail) {
+      updateNotificationTracking(visitor.id, {
+        hostEmail: undefined,
+        notificationStatus: 'skipped',
+        notificationChannel: 'email',
+        notificationAttemptedAt: attemptedAt,
+        notificationSentAt: undefined,
+        notificationError: undefined,
+      });
+
+      return {
+        status: 'skipped',
+        message: 'Ingen e-postadress finns sparad f\u00f6r den h\u00e4r v\u00e4rden.',
+      };
+    }
+
+    addSavedHost({ name: visitor.host, email: hostEmail });
+
+    if (!isHostNotificationConfigured()) {
+      updateNotificationTracking(visitor.id, {
+        hostEmail,
+        notificationStatus: 'not-configured',
+        notificationChannel: 'email',
+        notificationAttemptedAt: attemptedAt,
+        notificationSentAt: undefined,
+        notificationError: undefined,
+      });
+
+      return {
+        status: 'not-configured',
+        recipient: hostEmail,
+        message: 'Automatiska e-postutskick \u00e4r inte aktiverade \u00e4n.',
+      };
+    }
+
+    updateNotificationTracking(visitor.id, {
+      hostEmail,
+      notificationStatus: 'pending',
+      notificationChannel: 'email',
+      notificationAttemptedAt: attemptedAt,
+      notificationSentAt: undefined,
+      notificationError: undefined,
+    });
+
+    const result = await sendHostNotification({
+      visitorId: visitor.id,
+      visitorName: visitor.name,
+      company: visitor.company,
+      hostName: visitor.host,
+      hostEmail,
+      language: visitor.language,
+      checkInTime: visitor.checkInTime || attemptedAt,
+      preBooked: visitor.preBooked,
+    });
+
+    updateNotificationTracking(visitor.id, {
+      hostEmail,
+      notificationStatus: result.status,
+      notificationChannel: 'email',
+      notificationAttemptedAt: attemptedAt,
+      notificationSentAt: result.sentAt,
+      notificationError: normalizeOptionalText(result.error),
+    });
+
+    return result;
   };
 
   const exportBackup = (): VisitorDataBackup => ({
@@ -503,7 +708,6 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   };
 
-
   return (
     <VisitorContext.Provider value={{
       visitors,
@@ -518,6 +722,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       checkIn,
       checkOut,
       registerWalkIn,
+      notifyHost,
 
       addSavedHost,
       updateSavedHost,
@@ -528,7 +733,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       deleteSavedVisitor,
 
       exportBackup,
-      importBackup
+      importBackup,
     }}>
       {children}
     </VisitorContext.Provider>

@@ -10,19 +10,21 @@ export const SavedDataList: React.FC = () => {
   const {
     savedHosts, savedVisitors,
     updateSavedHost, deleteSavedHost,
-    updateSavedVisitor, deleteSavedVisitor
+    updateSavedVisitor, deleteSavedVisitor,
   } = useVisitorContext();
 
   const [editingHost, setEditingHost] = useState<string | null>(null);
   const [editHostName, setEditHostName] = useState('');
+  const [editHostEmail, setEditHostEmail] = useState('');
 
   const [editingVisitor, setEditingVisitor] = useState<string | null>(null);
   const [editVisitorName, setEditVisitorName] = useState('');
   const [editVisitorCompany, setEditVisitorCompany] = useState('');
 
-  const startEditHost = (id: string, name: string) => {
+  const startEditHost = (id: string, name: string, email?: string) => {
     setEditingHost(id);
     setEditHostName(name);
+    setEditHostEmail(email ?? '');
   };
 
   const saveHost = (id: string) => {
@@ -30,13 +32,14 @@ export const SavedDataList: React.FC = () => {
       return;
     }
 
-    updateSavedHost(id, { name: editHostName });
+    updateSavedHost(id, { name: editHostName, email: editHostEmail });
     setEditingHost(null);
   };
 
   const cancelEditHost = () => {
     setEditingHost(null);
     setEditHostName('');
+    setEditHostEmail('');
   };
 
   const startEditVisitor = (id: string, name: string, company: string) => {
@@ -59,43 +62,73 @@ export const SavedDataList: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+    <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>{'Sparade v\u00e4rdar'}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 max-h-96 overflow-y-auto">
+        <CardContent className="max-h-96 space-y-4 overflow-y-auto">
           {savedHosts.length === 0 ? (
             <p className="text-sm text-gray-500">{'Inga sparade v\u00e4rdar.'}</p>
           ) : (
             savedHosts.map(host => (
-              <div key={host.id} className="flex items-center justify-between p-2 border rounded-md bg-white">
+              <div key={host.id} className="rounded-md border bg-white p-3">
                 {editingHost === host.id ? (
-                  <div className="flex gap-2 w-full items-center">
-                    <Input
-                      value={editHostName}
-                      onChange={e => setEditHostName(e.target.value)}
-                      className="h-8"
-                    />
-                    <Button size="icon" variant="ghost" onClick={() => saveHost(host.id)} className="h-8 w-8 text-green-600">
-                      <Save size={16} />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={cancelEditHost} className="h-8 w-8 text-red-600">
-                      <X size={16} />
-                    </Button>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Namn</Label>
+                      <Input
+                        value={editHostName}
+                        onChange={e => setEditHostName(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{'E-post f\u00f6r notifiering'}</Label>
+                      <Input
+                        type="email"
+                        value={editHostEmail}
+                        onChange={e => setEditHostEmail(e.target.value)}
+                        className="h-9"
+                        placeholder="vard@foretag.se"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => saveHost(host.id)} className="text-green-600">
+                        <Save size={16} className="mr-1" /> Spara
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={cancelEditHost} className="text-red-600">
+                        <X size={16} className="mr-1" /> Avbryt
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <>
-                    <span className="font-medium">{host.name}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{host.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {host.email || 'Ingen e-post sparad'}
+                      </p>
+                    </div>
                     <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => startEditHost(host.id, host.name)} className="h-8 w-8 text-blue-600">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => startEditHost(host.id, host.name, host.email)}
+                        className="h-8 w-8 text-blue-600"
+                      >
                         <Edit2 size={16} />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => deleteSavedHost(host.id)} className="h-8 w-8 text-red-600">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteSavedHost(host.id)}
+                        className="h-8 w-8 text-red-600"
+                      >
                         <Trash2 size={16} />
                       </Button>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             ))
@@ -107,12 +140,12 @@ export const SavedDataList: React.FC = () => {
         <CardHeader>
           <CardTitle>{'Sparade bes\u00f6kare'}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 max-h-96 overflow-y-auto">
+        <CardContent className="max-h-96 space-y-4 overflow-y-auto">
           {savedVisitors.length === 0 ? (
             <p className="text-sm text-gray-500">{'Inga sparade bes\u00f6kare.'}</p>
           ) : (
             savedVisitors.map(visitor => (
-              <div key={visitor.id} className="p-2 border rounded-md bg-white">
+              <div key={visitor.id} className="rounded-md border bg-white p-2">
                 {editingVisitor === visitor.id ? (
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -125,7 +158,7 @@ export const SavedDataList: React.FC = () => {
                         <Input value={editVisitorCompany} onChange={e => setEditVisitorCompany(e.target.value)} className="h-8" />
                       </div>
                     </div>
-                    <div className="flex justify-end gap-2 mt-2">
+                    <div className="mt-2 flex justify-end gap-2">
                       <Button size="sm" variant="ghost" onClick={() => saveVisitor(visitor.id)} className="text-green-600">
                         <Save size={16} className="mr-1" /> Spara
                       </Button>

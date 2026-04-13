@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useVisitorContext } from '@/context/VisitorContext';
 import { SavedDataList } from './SavedDataList';
@@ -13,6 +14,7 @@ export const AddVisitorForm: React.FC = () => {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [host, setHost] = useState('');
+  const [hostEmail, setHostEmail] = useState('');
   const [expectedArrival, setExpectedArrival] = useState(() => getRoundedCurrentIso());
 
   const handleNameChange = (newName: string) => {
@@ -24,6 +26,13 @@ export const AddVisitorForm: React.FC = () => {
     }
   };
 
+  const handleHostChange = (newHost: string) => {
+    setHost(newHost);
+
+    const knownHost = uniqueHosts.find(savedHost => savedHost.name.toLowerCase() === newHost.toLowerCase());
+    setHostEmail(knownHost?.email ?? '');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !company || !host) return;
@@ -32,12 +41,14 @@ export const AddVisitorForm: React.FC = () => {
       name,
       company,
       host,
+      hostEmail,
       expectedArrival,
     });
 
     setName('');
     setCompany('');
     setHost('');
+    setHostEmail('');
     setExpectedArrival(getRoundedCurrentIso());
   };
 
@@ -49,7 +60,7 @@ export const AddVisitorForm: React.FC = () => {
         </CardHeader>
         <form onSubmit={handleSubmit} autoComplete="off">
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Namn *</Label>
                 <Combobox
@@ -78,12 +89,22 @@ export const AddVisitorForm: React.FC = () => {
                   id="host"
                   required
                   value={host}
-                  onChange={setHost}
+                  onChange={handleHostChange}
                   items={uniqueHosts.map(h => h.name)}
                   placeholder={'V\u00e4rd'}
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="host-email">{'V\u00e4rdens e-post'}</Label>
+                <Input
+                  id="host-email"
+                  type="email"
+                  value={hostEmail}
+                  onChange={e => setHostEmail(e.target.value)}
+                  placeholder="vard@foretag.se"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
                 <DateTimePicker
                   label={'F\u00f6rv\u00e4ntad ankomst'}
                   value={expectedArrival}
@@ -93,7 +114,10 @@ export const AddVisitorForm: React.FC = () => {
               </div>
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              Spara hostens e-post nu s\u00e5 \u00e4r bokningen redo n\u00e4r Supabase-notifiering aktiveras.
+            </p>
             <Button type="submit" className="bg-slate-700 hover:bg-slate-800">Spara bokning</Button>
           </CardFooter>
         </form>

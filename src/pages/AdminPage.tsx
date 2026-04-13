@@ -5,6 +5,7 @@ import { VisitorList } from '../components/admin/VisitorList';
 import { ActivityLog } from '../components/admin/ActivityLog';
 import { BackupPanel } from '../components/admin/BackupPanel';
 import { Button } from '@/components/ui/button';
+import { isHostNotificationConfigured } from '@/lib/host-notifications';
 import {
   hasConfiguredAdminPin,
   hasManagedAdminPin,
@@ -17,6 +18,7 @@ export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => hasConfiguredAdminPin() && isAdminSessionActive()
   );
+  const notificationsReady = isHostNotificationConfigured();
 
   const handleAuthenticated = () => {
     setHasPinConfigured(true);
@@ -54,6 +56,16 @@ export const AdminPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <Button variant="outline" onClick={handleLogout}>Logga ut</Button>
+      </div>
+
+      <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
+        notificationsReady
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          : 'border-amber-200 bg-amber-50 text-amber-800'
+      }`}>
+        {notificationsReady
+          ? 'Hostnotifiering via e-post \u00e4r konfigurerad. Nya incheckningar kan skicka ett riktigt meddelande.'
+          : 'Hosters e-postadresser kan sparas redan nu. Sj\u00e4lva utskicket aktiveras n\u00e4r Supabase- och notifieringsmilj\u00f6variablerna \u00e4r satta.'}
       </div>
 
       <AddVisitorForm />
