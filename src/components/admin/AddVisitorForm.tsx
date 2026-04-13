@@ -6,13 +6,14 @@ import { useVisitorContext } from '@/context/VisitorContext';
 import { SavedDataList } from './SavedDataList';
 import { Combobox } from '@/components/ui/combobox';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
+import { getRoundedCurrentIso } from '@/lib/date-time';
 
 export const AddVisitorForm: React.FC = () => {
   const { addVisitor, uniqueHosts, uniqueVisitors } = useVisitorContext();
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [host, setHost] = useState('');
-  const [expectedArrival, setExpectedArrival] = useState('');
+  const [expectedArrival, setExpectedArrival] = useState(() => getRoundedCurrentIso());
 
   const handleNameChange = (newName: string) => {
     setName(newName);
@@ -20,7 +21,7 @@ export const AddVisitorForm: React.FC = () => {
     // Auto-fill company if known visitor
     const knownVisitor = uniqueVisitors.find(v => v.name.toLowerCase() === newName.toLowerCase());
     if (knownVisitor) {
-      if (!company) setCompany(knownVisitor.company);
+      setCompany(knownVisitor.company);
     }
   };
 
@@ -32,13 +33,13 @@ export const AddVisitorForm: React.FC = () => {
       name,
       company,
       host,
-      expectedArrival: expectedArrival || new Date().toISOString(),
+      expectedArrival,
     });
     // Reset
     setName('');
     setCompany('');
     setHost('');
-    setExpectedArrival('');
+    setExpectedArrival(getRoundedCurrentIso());
   };
 
   return (

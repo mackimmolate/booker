@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Booker Icon</title>
+  <desc id="desc">Rounded square with a doorway, check mark, and booking card.</desc>
+  <rect width="256" height="256" rx="56" fill="#334155" />
+  <rect x="52" y="44" width="152" height="168" rx="20" fill="#f8fafc" />
+  <rect x="84" y="84" width="88" height="108" rx="12" fill="#e2e8f0" />
+  <rect x="106" y="116" width="44" height="76" rx="10" fill="#334155" />
+  <path d="M124 100h22" stroke="#334155" stroke-width="12" stroke-linecap="round" />
+  <path
+    d="M76 96l16 16 28-32"
+    fill="none"
+    stroke="#10b981"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="12"
+  />
+</svg>

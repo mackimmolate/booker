@@ -8,11 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Combobox } from '@/components/ui/combobox';
 import { Label } from '@/components/ui/label';
-
-// Since I don't have a Dialog component in src/components/ui/dialog explicitly shown in file list (I see button, card, input),
-// I'll implement a simple inline editing mode or a custom overlay if needed.
-// However, the prompt asked for "edit booking like a small pen".
-// Let's check file list for dialog.
+import { type Visitor } from '@/types';
 
 export const VisitorList: React.FC = () => {
   const { visitors, updateVisitor, uniqueHosts, uniqueVisitors } = useVisitorContext();
@@ -24,7 +20,7 @@ export const VisitorList: React.FC = () => {
   const [editHost, setEditHost] = useState('');
   const [editArrival, setEditArrival] = useState('');
 
-  const startEdit = (visitor: any) => {
+  const startEdit = (visitor: Visitor) => {
     setEditingId(visitor.id);
     setEditName(visitor.name);
     setEditCompany(visitor.company);
@@ -37,15 +33,17 @@ export const VisitorList: React.FC = () => {
   };
 
   const saveEdit = () => {
-    if (editingId) {
-      updateVisitor(editingId, {
-        name: editName,
-        company: editCompany,
-        host: editHost,
-        expectedArrival: editArrival
-      });
-      setEditingId(null);
+    if (!editingId || !editName.trim() || !editCompany.trim() || !editHost.trim()) {
+      return;
     }
+
+    updateVisitor(editingId, {
+      name: editName,
+      company: editCompany,
+      host: editHost,
+      expectedArrival: editArrival
+    });
+    setEditingId(null);
   };
 
   return (

@@ -12,6 +12,7 @@ export const ReceptionPage: React.FC = () => {
   const [lang, setLang] = useState<Language>('sv');
   const [view, setView] = useState<'home' | 'check-in-mode' | 'check-in-search' | 'check-in-walkin' | 'check-out' | 'success'>('home');
   const [message, setMessage] = useState('');
+  const [successType, setSuccessType] = useState<'welcome' | 'goodbye'>('welcome');
   const t = translations[lang];
   const { visitors, checkIn, checkOut, registerWalkIn, uniqueHosts } = useVisitorContext();
 
@@ -34,6 +35,7 @@ export const ReceptionPage: React.FC = () => {
   const handleCheckIn = (id: string, name: string, host: string) => {
     checkIn(id);
     setMessage(t.welcomeMessage.replace('{name}', name).replace('{host}', host));
+    setSuccessType('welcome');
     setView('success');
   };
 
@@ -42,12 +44,14 @@ export const ReceptionPage: React.FC = () => {
     if (!formData.name || !formData.company || !formData.host) return;
     registerWalkIn({ ...formData, language: lang });
     setMessage(t.welcomeMessage.replace('{name}', formData.name).replace('{host}', formData.host));
+    setSuccessType('welcome');
     setView('success');
   };
 
   const handleCheckOut = (id: string, name: string) => {
     checkOut(id);
     setMessage(t.goodbyeMessage.replace('{name}', name));
+    setSuccessType('goodbye');
     setView('success');
   };
 
@@ -188,12 +192,6 @@ export const ReceptionPage: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="w-host" className="text-lg">{t.host}</Label>
-                  {/* Restricted Host Selection - Using Combobox for consistency but restricted via logic if needed,
-                      or just items prop. User asked for 'only allow host selection from saved hosts'.
-                      The Combobox filters by default. If we want to STRICTLY disallow new ones,
-                      we'd need a Select or validate the input.
-                      Given Kiosk context, a readonly text input with dropdown or strictly Select is safer.
-                      However, simple Combobox populated with saved hosts satisfies 'allow selection'. */}
                   <Combobox
                     id="w-host"
                     required
@@ -260,7 +258,9 @@ export const ReceptionPage: React.FC = () => {
             <div className="flex justify-center mb-6">
               <CheckCircle className="text-green-500 w-32 h-32" />
             </div>
-            <h2 className="text-4xl font-bold mb-4">{message.includes(t.goodbyeMessage.split('{')[0]) ? t.goodbye : t.welcome}</h2>
+            <h2 className="text-4xl font-bold mb-4">
+              {successType === 'goodbye' ? t.goodbye : t.welcome}
+            </h2>
             <p className="text-2xl text-gray-600 max-w-md mx-auto">{message}</p>
           </div>
         )}

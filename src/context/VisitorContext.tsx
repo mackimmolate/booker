@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { type Visitor, type LogEntry, type VisitorContextType, type VisitorStatus, type SavedVisitor, type SavedHost } from '../types';
 
 const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
@@ -7,52 +7,121 @@ const STORAGE_KEY_VISITORS = 'vms_visitors';
 const STORAGE_KEY_LOGS = 'vms_logs';
 const STORAGE_KEY_SAVED_HOSTS = 'vms_saved_hosts';
 const STORAGE_KEY_SAVED_VISITORS = 'vms_saved_visitors';
+const STORAGE_KEYS = [
+  STORAGE_KEY_VISITORS,
+  STORAGE_KEY_LOGS,
+  STORAGE_KEY_SAVED_HOSTS,
+  STORAGE_KEY_SAVED_VISITORS,
+] as const;
+
+const normalizeText = (value?: string) => value?.trim().replace(/\s+/g, ' ') ?? '';
+
+const normalizeOptionalText = (value?: string) => {
+  const normalizedValue = normalizeText(value);
+  return normalizedValue || undefined;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const loadVisitors = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_VISITORS);
+    return stored ? JSON.parse(stored) as Visitor[] : [];
+  } catch (e) {
+    console.error('Failed to load visitors from local storage', e);
+    return [];
+  }
+};
+
+const loadLogs = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_LOGS);
+    return stored ? JSON.parse(stored) as LogEntry[] : [];
+  } catch (e) {
+    console.error('Failed to load logs from local storage', e);
+    return [];
+  }
+};
+
+const loadSavedHosts = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_SAVED_HOSTS);
+    const parsed = stored ? JSON.parse(stored) as unknown : [];
+    const candidateHosts = Array.isArray(parsed) ? parsed : [];
+    const seenNames = new Set<string>();
+
+    return candidateHosts.reduce<SavedHost[]>((hosts, entry) => {
+      const nextHost = typeof entry === 'string'
+        ? { id: crypto.randomUUID(), name: normalizeText(entry) }
+        : isRecord(entry)
+          ? {
+              id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+              name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
+            }
+          : null;
+
+      if (!nextHost?.name) {
+        return hosts;
+      }
+
+      const normalizedName = nextHost.name.toLowerCase();
+      if (seenNames.has(normalizedName)) {
+        return hosts;
+      }
+
+      seenNames.add(normalizedName);
+      hosts.push(nextHost);
+      return hosts;
+    }, []);
+  } catch (e) {
+    console.error('Failed to load saved hosts from local storage', e);
+    return [];
+  }
+};
+
+const loadSavedVisitors = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_SAVED_VISITORS);
+    const parsed = stored ? JSON.parse(stored) as unknown : [];
+    const candidateVisitors = Array.isArray(parsed) ? parsed : [];
+    const seenNames = new Set<string>();
+
+    return candidateVisitors.reduce<SavedVisitor[]>((visitors, entry) => {
+      if (!isRecord(entry)) {
+        return visitors;
+      }
+
+      const nextVisitor: SavedVisitor = {
+        id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+        name: normalizeText(typeof entry.name === 'string' ? entry.name : ''),
+        company: normalizeText(typeof entry.company === 'string' ? entry.company : ''),
+      };
+
+      if (!nextVisitor.name || !nextVisitor.company) {
+        return visitors;
+      }
+
+      const normalizedName = nextVisitor.name.toLowerCase();
+      if (seenNames.has(normalizedName)) {
+        return visitors;
+      }
+
+      seenNames.add(normalizedName);
+      visitors.push(nextVisitor);
+      return visitors;
+    }, []);
+  } catch (e) {
+    console.error('Failed to load saved visitors from local storage', e);
+    return [];
+  }
+};
 
 export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [visitors, setVisitors] = useState<Visitor[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_VISITORS);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      console.error("Failed to load visitors from local storage", e);
-      return [];
-    }
-  });
-
-  const [logs, setLogs] = useState<LogEntry[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_LOGS);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      console.error("Failed to load logs from local storage", e);
-      return [];
-    }
-  });
-
-  const [savedHosts, setSavedHosts] = useState<SavedHost[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SAVED_HOSTS);
-      // Migration from old string array to object array if needed
-      const parsed = stored ? JSON.parse(stored) : [];
-      if (parsed.length > 0 && typeof parsed[0] === 'string') {
-          return parsed.map((name: string) => ({ id: crypto.randomUUID(), name }));
-      }
-      return parsed;
-    } catch (e) {
-      console.error("Failed to load saved hosts from local storage", e);
-      return [];
-    }
-  });
-
-  const [savedVisitors, setSavedVisitors] = useState<SavedVisitor[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SAVED_VISITORS);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      console.error("Failed to load saved visitors from local storage", e);
-      return [];
-    }
-  });
+  const [visitors, setVisitors] = useState<Visitor[]>(loadVisitors);
+  const [logs, setLogs] = useState<LogEntry[]>(loadLogs);
+  const [savedHosts, setSavedHosts] = useState<SavedHost[]>(loadSavedHosts);
+  const [savedVisitors, setSavedVisitors] = useState<SavedVisitor[]>(loadSavedVisitors);
 
   // Save to local storage whenever state changes
   useEffect(() => {
@@ -71,9 +140,37 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem(STORAGE_KEY_SAVED_VISITORS, JSON.stringify(savedVisitors));
   }, [savedVisitors]);
 
-  // Derived state for lists
-  const uniqueHosts = savedHosts.sort((a, b) => a.name.localeCompare(b.name));
-  const uniqueVisitors = savedVisitors.sort((a, b) => a.name.localeCompare(b.name));
+  useEffect(() => {
+    const syncFromStorage = () => {
+      setVisitors(loadVisitors());
+      setLogs(loadLogs());
+      setSavedHosts(loadSavedHosts());
+      setSavedVisitors(loadSavedVisitors());
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || STORAGE_KEYS.includes(event.key as (typeof STORAGE_KEYS)[number])) {
+        syncFromStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('focus', syncFromStorage);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', syncFromStorage);
+    };
+  }, []);
+
+  const uniqueHosts = useMemo(
+    () => [...savedHosts].sort((a, b) => a.name.localeCompare(b.name)),
+    [savedHosts]
+  );
+  const uniqueVisitors = useMemo(
+    () => [...savedVisitors].sort((a, b) => a.name.localeCompare(b.name)),
+    [savedVisitors]
+  );
 
   const addLog = (visitor: Visitor, action: LogEntry['action']) => {
     const newLog: LogEntry = {
@@ -89,15 +186,38 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const addSavedHost = (host: Omit<SavedHost, 'id'>) => {
+    const normalizedName = normalizeText(host.name);
+    if (!normalizedName) {
+      return;
+    }
+
     setSavedHosts(prev => {
-      // Avoid duplicates by name
-      if (prev.some(h => h.name.toLowerCase() === host.name.toLowerCase())) return prev;
-      return [...prev, { ...host, id: crypto.randomUUID() }];
+      if (prev.some(existingHost => existingHost.name.toLowerCase() === normalizedName.toLowerCase())) {
+        return prev;
+      }
+
+      return [...prev, { id: crypto.randomUUID(), name: normalizedName }];
     });
   };
 
   const updateSavedHost = (id: string, updates: Partial<SavedHost>) => {
-    setSavedHosts(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+    setSavedHosts(prev => {
+      const currentHost = prev.find(host => host.id === id);
+      if (!currentHost) {
+        return prev;
+      }
+
+      const nextName = updates.name === undefined ? currentHost.name : normalizeText(updates.name);
+      if (!nextName) {
+        return prev;
+      }
+
+      if (prev.some(host => host.id !== id && host.name.toLowerCase() === nextName.toLowerCase())) {
+        return prev;
+      }
+
+      return prev.map(host => host.id === id ? { ...host, name: nextName } : host);
+    });
   };
 
   const deleteSavedHost = (id: string) => {
@@ -105,15 +225,43 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const addSavedVisitor = (visitor: Omit<SavedVisitor, 'id'>) => {
+    const normalizedName = normalizeText(visitor.name);
+    const normalizedCompany = normalizeText(visitor.company);
+    if (!normalizedName || !normalizedCompany) {
+      return;
+    }
+
     setSavedVisitors(prev => {
-      // Avoid duplicates by name
-      if (prev.some(v => v.name.toLowerCase() === visitor.name.toLowerCase())) return prev;
-      return [...prev, { ...visitor, id: crypto.randomUUID() }];
+      if (prev.some(savedVisitor => savedVisitor.name.toLowerCase() === normalizedName.toLowerCase())) {
+        return prev;
+      }
+
+      return [...prev, { id: crypto.randomUUID(), name: normalizedName, company: normalizedCompany }];
     });
   };
 
   const updateSavedVisitor = (id: string, updates: Partial<SavedVisitor>) => {
-    setSavedVisitors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+    setSavedVisitors(prev => {
+      const currentVisitor = prev.find(visitor => visitor.id === id);
+      if (!currentVisitor) {
+        return prev;
+      }
+
+      const nextName = updates.name === undefined ? currentVisitor.name : normalizeText(updates.name);
+      const nextCompany = updates.company === undefined ? currentVisitor.company : normalizeText(updates.company);
+      if (!nextName || !nextCompany) {
+        return prev;
+      }
+
+      if (prev.some(visitor => visitor.id !== id && visitor.name.toLowerCase() === nextName.toLowerCase())) {
+        return prev;
+      }
+
+      return prev.map(visitor => visitor.id === id
+        ? { ...visitor, name: nextName, company: nextCompany }
+        : visitor
+      );
+    });
   };
 
   const deleteSavedVisitor = (id: string) => {
@@ -121,8 +269,19 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const addVisitor = (data: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked'>) => {
+    const normalizedName = normalizeText(data.name);
+    const normalizedCompany = normalizeText(data.company);
+    const normalizedHost = normalizeText(data.host);
+    if (!normalizedName || !normalizedCompany || !normalizedHost) {
+      return;
+    }
+
     const newVisitor: Visitor = {
       ...data,
+      name: normalizedName,
+      company: normalizedCompany,
+      host: normalizedHost,
+      phone: normalizeOptionalText(data.phone),
       id: crypto.randomUUID(),
       status: 'booked',
       language: 'sv', // Default
@@ -130,21 +289,24 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     setVisitors(prev => [...prev, newVisitor]);
     addLog(newVisitor, 'registered');
-
-    // Auto-save new host if not exists
-    if (!savedHosts.some(h => h.name.toLowerCase() === data.host.toLowerCase())) {
-        addSavedHost({ name: data.host });
-    }
-
-    // Auto-save new visitor if not exists
-    if (!savedVisitors.some(v => v.name.toLowerCase() === data.name.toLowerCase())) {
-        addSavedVisitor({ name: data.name, company: data.company });
-    }
+    addSavedHost({ name: newVisitor.host });
+    addSavedVisitor({ name: newVisitor.name, company: newVisitor.company });
   };
 
   const registerWalkIn = (data: Omit<Visitor, 'id' | 'status' | 'preBooked'>) => {
+    const normalizedName = normalizeText(data.name);
+    const normalizedCompany = normalizeText(data.company);
+    const normalizedHost = normalizeText(data.host);
+    if (!normalizedName || !normalizedCompany || !normalizedHost) {
+      return;
+    }
+
     const newVisitor: Visitor = {
       ...data,
+      name: normalizedName,
+      company: normalizedCompany,
+      host: normalizedHost,
+      phone: normalizeOptionalText(data.phone),
       id: crypto.randomUUID(),
       status: 'checked-in',
       preBooked: false,
@@ -152,14 +314,8 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     setVisitors(prev => [...prev, newVisitor]);
     addLog(newVisitor, 'check-in');
-
-    // Auto-save host and visitor on walk-in too? Probably yes.
-    if (!savedHosts.some(h => h.name.toLowerCase() === data.host.toLowerCase())) {
-        addSavedHost({ name: data.host });
-    }
-    if (!savedVisitors.some(v => v.name.toLowerCase() === data.name.toLowerCase())) {
-        addSavedVisitor({ name: data.name, company: data.company });
-    }
+    addSavedHost({ name: newVisitor.host });
+    addSavedVisitor({ name: newVisitor.name, company: newVisitor.company });
   };
 
   const checkIn = (visitorId: string, details?: Partial<Visitor>) => {
@@ -203,6 +359,39 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const updateVisitor = (id: string, updates: Partial<Visitor>) => {
+    let updatedVisitor: Visitor | undefined;
+
+    setVisitors(prev => prev.map(visitor => {
+      if (visitor.id !== id) {
+        return visitor;
+      }
+
+      const nextName = updates.name === undefined ? visitor.name : normalizeText(updates.name);
+      const nextCompany = updates.company === undefined ? visitor.company : normalizeText(updates.company);
+      const nextHost = updates.host === undefined ? visitor.host : normalizeText(updates.host);
+      if (!nextName || !nextCompany || !nextHost) {
+        return visitor;
+      }
+
+      updatedVisitor = {
+        ...visitor,
+        ...updates,
+        name: nextName,
+        company: nextCompany,
+        host: nextHost,
+        phone: updates.phone === undefined ? visitor.phone : normalizeOptionalText(updates.phone),
+      };
+
+      return updatedVisitor;
+    }));
+
+    if (updatedVisitor) {
+      addSavedHost({ name: updatedVisitor.host });
+      addSavedVisitor({ name: updatedVisitor.name, company: updatedVisitor.company });
+    }
+  };
+
 
   return (
     <VisitorContext.Provider value={{
@@ -214,7 +403,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       savedVisitors,
 
       addVisitor,
-      updateVisitor: (id, updates) => setVisitors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v)),
+      updateVisitor,
       checkIn,
       checkOut,
       registerWalkIn,

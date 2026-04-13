@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link } from 'react-router-dom';
 import { AdminPage } from './pages/AdminPage';
 import { ReceptionPage } from './pages/ReceptionPage';
 import { Button } from './components/ui/button';
@@ -19,13 +19,13 @@ const Landing = () => (
 
 function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/reception" element={<ReceptionPage />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

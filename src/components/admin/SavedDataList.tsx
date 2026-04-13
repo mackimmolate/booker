@@ -27,6 +27,10 @@ export const SavedDataList: React.FC = () => {
   };
 
   const saveHost = (id: string) => {
+    if (!editHostName.trim()) {
+      return;
+    }
+
     updateSavedHost(id, { name: editHostName });
     setEditingHost(null);
   };
@@ -44,6 +48,10 @@ export const SavedDataList: React.FC = () => {
   };
 
   const saveVisitor = (id: string) => {
+    if (!editVisitorName.trim() || !editVisitorCompany.trim()) {
+      return;
+    }
+
     updateSavedVisitor(id, { name: editVisitorName, company: editVisitorCompany });
     setEditingVisitor(null);
   };

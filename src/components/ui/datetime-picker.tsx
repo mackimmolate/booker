@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  buildIsoFromLocalParts,
+  getRoundedCurrentIso,
+  parseIsoToLocalParts,
+} from '@/lib/date-time';
 
 interface DateTimePickerProps {
   label: string;
@@ -10,42 +15,28 @@ interface DateTimePickerProps {
 }
 
 export const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, value, onChange, required }) => {
-  // Parse initial value or use current time
   const [date, setDate] = useState('');
   const [hour, setHour] = useState('09');
   const [minute, setMinute] = useState('00');
 
   useEffect(() => {
-    if (value) {
-      const d = new Date(value);
-      setDate(d.toISOString().split('T')[0]);
-      setHour(d.getHours().toString().padStart(2, '0'));
-      setMinute(d.getMinutes().toString().padStart(2, '0'));
-    } else {
-      const now = new Date();
-      setDate(now.toISOString().split('T')[0]);
-      const currentHour = now.getHours();
-      // Round to next 5 min
-      let currentMinute = Math.ceil(now.getMinutes() / 5) * 5;
-      let nextHour = currentHour;
-      if (currentMinute === 60) {
-        currentMinute = 0;
-        nextHour = (nextHour + 1) % 24;
-      }
-      setHour(nextHour.toString().padStart(2, '0'));
-      setMinute(currentMinute.toString().padStart(2, '0'));
+    const localParts = parseIsoToLocalParts(value) ?? parseIsoToLocalParts(getRoundedCurrentIso());
+    if (!localParts) {
+      return;
     }
-  }, [value]); // Only run when value prop changes externally (e.g. reset)
+
+    setDate(localParts.date);
+    setHour(localParts.hour);
+    setMinute(localParts.minute);
+  }, [value]);
 
   const updateISO = (d: string, h: string, m: string) => {
-    if (!d) return; // Wait for date
-    // Could add timezone handling here if needed, but keeping it local-iso-like for now
-    // Actually, let's create a Date object to get proper ISO string with timezone or just use local string
-    // The app uses new Date().toISOString() elsewhere which is UTC.
-    // Let's stick to constructing a local-time ISO-like string for the App to consume
-    // Or better: Create a Date object from the inputs
-    const dateObj = new Date(`${d}T${h}:${m}:00`);
-    onChange(dateObj.toISOString());
+    const nextIsoString = buildIsoFromLocalParts(d, h, m);
+    if (!nextIsoString) {
+      return;
+    }
+
+    onChange(nextIsoString);
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +58,10 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, value, on
   };
 
   const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
-  const minutes = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+  const defaultMinutes = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+  const minutes = defaultMinutes.includes(minute)
+    ? defaultMinutes
+    : [...defaultMinutes, minute].sort((left, right) => Number(left) - Number(right));
 
   return (
     <div className="space-y-2">
