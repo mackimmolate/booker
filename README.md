@@ -22,3 +22,9 @@ A Modern PWA for Visitor Management.
 - Save `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in your env file when that backend exists.
 - If you prefer a custom endpoint, set `VITE_NOTIFICATION_ENDPOINT` instead.
 - Until the backend is configured, the kiosk will register the visitor arrival without claiming that an email was actually sent.
+
+## Supabase API
+- `supabase/functions/booker-api/index.ts` is the first controlled Edge Function for database access.
+- Set `BOOKER_ADMIN_PIN` as an Edge Function secret in Supabase.
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the frontend env to test the API from `/admin`.
+- Do not use the backend `BOOKER_ADMIN_PIN` as a deployed `VITE_` variable. The admin test panel asks for it at runtime.

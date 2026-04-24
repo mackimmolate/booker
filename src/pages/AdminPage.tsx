@@ -4,6 +4,7 @@ import { AddVisitorForm } from '../components/admin/AddVisitorForm';
 import { VisitorList } from '../components/admin/VisitorList';
 import { ActivityLog } from '../components/admin/ActivityLog';
 import { BackupPanel } from '../components/admin/BackupPanel';
+import { SupabaseStatusPanel } from '../components/admin/SupabaseStatusPanel';
 import { Button } from '@/components/ui/button';
 import { isHostNotificationConfigured } from '@/lib/host-notifications';
 import {
@@ -70,6 +71,7 @@ export const AdminPage: React.FC = () => {
 
       <AddVisitorForm />
       <VisitorList />
+      <SupabaseStatusPanel />
       <BackupPanel />
       <ActivityLog />
     </div>
