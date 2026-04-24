@@ -61,7 +61,6 @@ export const callBookerApi = async <TResponse>(
     headers: {
       'Content-Type': 'application/json',
       apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
       ...(options.adminPin ? { 'x-booker-admin-pin': options.adminPin } : {}),
     },
     body: JSON.stringify({

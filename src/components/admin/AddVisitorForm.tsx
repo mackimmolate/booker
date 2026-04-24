@@ -116,7 +116,7 @@ export const AddVisitorForm: React.FC = () => {
           </CardContent>
           <CardFooter className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-500">
-              Spara hostens e-post nu s\u00e5 \u00e4r bokningen redo n\u00e4r Supabase-notifiering aktiveras.
+              {'Spara hostens e-post nu s\u00e5 \u00e4r bokningen redo n\u00e4r Supabase-notifiering aktiveras.'}
             </p>
             <Button type="submit" className="bg-slate-700 hover:bg-slate-800">Spara bokning</Button>
           </CardFooter>

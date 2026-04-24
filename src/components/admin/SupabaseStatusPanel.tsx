@@ -80,15 +80,15 @@ export const SupabaseStatusPanel: React.FC = () => {
         {counts && (
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div className="rounded-md border bg-white p-3">
-              <p className="text-slate-500">V\u00e4rdar</p>
+              <p className="text-slate-500">{'V\u00e4rdar'}</p>
               <p className="text-xl font-semibold">{counts.hosts}</p>
             </div>
             <div className="rounded-md border bg-white p-3">
-              <p className="text-slate-500">Sparade bes\u00f6kare</p>
+              <p className="text-slate-500">{'Sparade bes\u00f6kare'}</p>
               <p className="text-xl font-semibold">{counts.savedVisitors}</p>
             </div>
             <div className="rounded-md border bg-white p-3">
-              <p className="text-slate-500">Bes\u00f6k</p>
+              <p className="text-slate-500">{'Bes\u00f6k'}</p>
               <p className="text-xl font-semibold">{counts.visits}</p>
             </div>
             <div className="rounded-md border bg-white p-3">

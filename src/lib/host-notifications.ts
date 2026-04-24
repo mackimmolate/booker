@@ -103,7 +103,6 @@ export const sendHostNotification = async (
       headers: {
         'Content-Type': 'application/json',
         apikey: config.anonKey,
-        Authorization: `Bearer ${config.anonKey}`,
       },
       body: JSON.stringify({
         type: 'host-check-in-email',
