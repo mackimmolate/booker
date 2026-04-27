@@ -123,15 +123,15 @@ export const VisitorList: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-2">
-                        {visitor.status === 'checked-in' ? (
+                        {visitor.status === 'booked' ? (
+                          <span className="text-sm text-slate-400">{'V\u00e4ntar p\u00e5 incheckning'}</span>
+                        ) : (
                           <div className="flex min-w-40 flex-col gap-1">
                             <NotificationStatusBadge status={visitor.notificationStatus} />
                             {visitor.notificationError && (
                               <p className="text-xs text-rose-600">{visitor.notificationError}</p>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-sm text-slate-400">{'V\u00e4ntar p\u00e5 incheckning'}</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">
