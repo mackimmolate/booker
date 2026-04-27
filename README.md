@@ -29,3 +29,4 @@ A Modern PWA for Visitor Management.
 - Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the frontend env to test the API from `/admin`.
 - Do not use the backend `BOOKER_ADMIN_PIN` as a deployed `VITE_` variable. The admin test panel asks for it at runtime.
 - If using an `sb_publishable_...` key, turn off JWT verification for the `booker-api` Edge Function. Access is controlled inside the function with `BOOKER_ADMIN_PIN`.
+- Current actions: `health`, `snapshot`, `createOrUpdateHost`, `deleteHost`, `createOrUpdateSavedVisitor`, `deleteSavedVisitor`, `createVisit`, `registerWalkIn`, `updateVisit`, `checkInVisit`, `checkOutVisit`.
