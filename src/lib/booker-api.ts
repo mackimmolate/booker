@@ -1,15 +1,20 @@
+import { type LogEntry, type SavedHost, type SavedVisitor, type Visitor } from '@/types';
+
 interface BookerApiConfig {
   endpoint: string;
   anonKey: string;
 }
 
 export interface BookerSnapshot {
-  hosts: unknown[];
-  savedVisitors: unknown[];
-  visits: unknown[];
-  logs: unknown[];
+  hosts: SavedHost[];
+  savedVisitors: SavedVisitor[];
+  visits: Visitor[];
+  logs: LogEntry[];
 }
 
+export const BOOKER_API_PIN_CHANGED_EVENT = 'booker-api-pin-changed';
+
+const BOOKER_API_PIN_KEY = 'vms_booker_api_pin';
 const normalizeText = (value: string | undefined) => value?.trim() ?? '';
 
 const getBookerApiConfig = (): BookerApiConfig | null => {
@@ -43,6 +48,26 @@ const getResponseMessage = (responseData: unknown) => {
 };
 
 export const isBookerApiConfigured = () => getBookerApiConfig() !== null;
+
+export const getStoredBookerApiPin = () =>
+  localStorage.getItem(BOOKER_API_PIN_KEY)?.trim() ?? '';
+
+export const setStoredBookerApiPin = (pin: string) => {
+  const normalizedPin = pin.trim();
+
+  if (!normalizedPin) {
+    localStorage.removeItem(BOOKER_API_PIN_KEY);
+  } else {
+    localStorage.setItem(BOOKER_API_PIN_KEY, normalizedPin);
+  }
+
+  window.dispatchEvent(new Event(BOOKER_API_PIN_CHANGED_EVENT));
+};
+
+export const clearStoredBookerApiPin = () => {
+  localStorage.removeItem(BOOKER_API_PIN_KEY);
+  window.dispatchEvent(new Event(BOOKER_API_PIN_CHANGED_EVENT));
+};
 
 export const callBookerApi = async <TResponse>(
   action: string,
@@ -81,5 +106,53 @@ export const callBookerApi = async <TResponse>(
 export const checkBookerApiHealth = () =>
   callBookerApi<{ ok: boolean; function: string }>('health');
 
-export const fetchBookerSnapshot = (adminPin: string) =>
+export const fetchBookerSnapshot = (adminPin = getStoredBookerApiPin()) =>
   callBookerApi<BookerSnapshot>('snapshot', { adminPin });
+
+export const createBookerHost = (host: Omit<SavedHost, 'id'> | SavedHost, adminPin = getStoredBookerApiPin()) =>
+  callBookerApi<{ host: SavedHost }>('createOrUpdateHost', { adminPin, payload: { host } });
+
+export const deleteBookerHost = (id: string, adminPin = getStoredBookerApiPin()) =>
+  callBookerApi<{ deleted: { id: string } }>('deleteHost', { adminPin, payload: { host: { id } } });
+
+export const createBookerSavedVisitor = (
+  savedVisitor: Omit<SavedVisitor, 'id'> | SavedVisitor,
+  adminPin = getStoredBookerApiPin()
+) =>
+  callBookerApi<{ savedVisitor: SavedVisitor }>('createOrUpdateSavedVisitor', {
+    adminPin,
+    payload: { savedVisitor },
+  });
+
+export const deleteBookerSavedVisitor = (id: string, adminPin = getStoredBookerApiPin()) =>
+  callBookerApi<{ deleted: { id: string } }>('deleteSavedVisitor', {
+    adminPin,
+    payload: { savedVisitor: { id } },
+  });
+
+export const createBookerVisit = (
+  visit: Partial<Visitor> & Pick<Visitor, 'name' | 'company' | 'host'>,
+  adminPin = getStoredBookerApiPin()
+) =>
+  callBookerApi<{ visit: Visitor }>('createVisit', { adminPin, payload: { visit } });
+
+export const registerBookerWalkIn = (
+  visit: Partial<Visitor> & Pick<Visitor, 'name' | 'company' | 'host' | 'language'>,
+  adminPin = getStoredBookerApiPin()
+) =>
+  callBookerApi<{ visit: Visitor }>('registerWalkIn', { adminPin, payload: { visit } });
+
+export const updateBookerVisit = (
+  visit: Partial<Visitor> & Pick<Visitor, 'id'>,
+  adminPin = getStoredBookerApiPin()
+) =>
+  callBookerApi<{ visit: Visitor }>('updateVisit', { adminPin, payload: { visit } });
+
+export const checkInBookerVisit = (
+  visit: Partial<Visitor> & Pick<Visitor, 'id'>,
+  adminPin = getStoredBookerApiPin()
+) =>
+  callBookerApi<{ visit: Visitor }>('checkInVisit', { adminPin, payload: { visit } });
+
+export const checkOutBookerVisit = (id: string, adminPin = getStoredBookerApiPin()) =>
+  callBookerApi<{ visit: Visitor }>('checkOutVisit', { adminPin, payload: { visit: { id } } });

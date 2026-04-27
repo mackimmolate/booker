@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { checkBookerApiHealth, fetchBookerSnapshot, isBookerApiConfigured } from '@/lib/booker-api';
+import { checkBookerApiHealth, fetchBookerSnapshot, getStoredBookerApiPin, isBookerApiConfigured } from '@/lib/booker-api';
+import { useVisitorContext } from '@/context/VisitorContext';
 
 type StatusState = 'idle' | 'checking' | 'ok' | 'error';
 
 export const SupabaseStatusPanel: React.FC = () => {
+  const { hasBackendPin, setBackendPin: saveBackendPin, syncStatus, syncError } = useVisitorContext();
   const isConfigured = isBookerApiConfigured();
   const [status, setStatus] = useState<StatusState>('idle');
   const [message, setMessage] = useState(
@@ -37,13 +39,16 @@ export const SupabaseStatusPanel: React.FC = () => {
     try {
       const health = await checkBookerApiHealth();
 
-      if (!backendPin.trim()) {
+      const normalizedPin = backendPin.trim() || getStoredBookerApiPin();
+
+      if (!normalizedPin) {
         setStatus('ok');
         setMessage(`${health.function} svarar. Ange backend-PIN f\u00f6r att testa databasanrop.`);
         return;
       }
 
-      const snapshot = await fetchBookerSnapshot(backendPin.trim());
+      const snapshot = await fetchBookerSnapshot(normalizedPin);
+      await saveBackendPin(normalizedPin);
       setCounts({
         hosts: snapshot.hosts.length,
         savedVisitors: snapshot.savedVisitors.length,
@@ -51,7 +56,7 @@ export const SupabaseStatusPanel: React.FC = () => {
         logs: snapshot.logs.length,
       });
       setStatus('ok');
-      setMessage(`${health.function} svarar och backend-PIN fungerar.`);
+      setMessage(`${health.function} svarar, backend-PIN fungerar och sparades f\u00f6r den h\u00e4r browsern.`);
     } catch (error) {
       setStatus('error');
       setMessage(error instanceof Error ? error.message : 'Supabase-testet misslyckades.');
@@ -76,6 +81,13 @@ export const SupabaseStatusPanel: React.FC = () => {
         }`}>
           {message}
         </div>
+
+        {hasBackendPin && (
+          <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
+            {'Backend-PIN \u00e4r sparad lokalt p\u00e5 den h\u00e4r enheten. Datasynk: '}{syncStatus}.
+            {syncError ? ` Senaste fel: ${syncError}` : ''}
+          </div>
+        )}
 
         {counts && (
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

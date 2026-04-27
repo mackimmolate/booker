@@ -21,6 +21,8 @@ export const VisitorList: React.FC = () => {
   const [editHost, setEditHost] = useState('');
   const [editHostEmail, setEditHostEmail] = useState('');
   const [editArrival, setEditArrival] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const startEdit = (visitor: Visitor) => {
     setEditingId(visitor.id);
@@ -29,10 +31,12 @@ export const VisitorList: React.FC = () => {
     setEditHost(visitor.host);
     setEditHostEmail(visitor.hostEmail || '');
     setEditArrival(visitor.expectedArrival || '');
+    setErrorMessage('');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+    setErrorMessage('');
   };
 
   const handleHostChange = (newHost: string) => {
@@ -42,19 +46,28 @@ export const VisitorList: React.FC = () => {
     setEditHostEmail(knownHost?.email ?? '');
   };
 
-  const saveEdit = () => {
-    if (!editingId || !editName.trim() || !editCompany.trim() || !editHost.trim()) {
+  const saveEdit = async () => {
+    if (isSaving || !editingId || !editName.trim() || !editCompany.trim() || !editHost.trim()) {
       return;
     }
 
-    updateVisitor(editingId, {
-      name: editName,
-      company: editCompany,
-      host: editHost,
-      hostEmail: editHostEmail,
-      expectedArrival: editArrival,
-    });
-    setEditingId(null);
+    setIsSaving(true);
+    setErrorMessage('');
+
+    try {
+      await updateVisitor(editingId, {
+        name: editName,
+        company: editCompany,
+        host: editHost,
+        hostEmail: editHostEmail,
+        expectedArrival: editArrival,
+      });
+      setEditingId(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Det gick inte att spara \u00e4ndringen.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -118,7 +131,7 @@ export const VisitorList: React.FC = () => {
                             )}
                           </div>
                         ) : (
-                          <span className="text-sm text-slate-400">V\u00e4ntar p\u00e5 incheckning</span>
+                          <span className="text-sm text-slate-400">{'V\u00e4ntar p\u00e5 incheckning'}</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">
@@ -198,8 +211,11 @@ export const VisitorList: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
+              {errorMessage && <p className="mr-auto text-sm text-rose-600">{errorMessage}</p>}
               <Button variant="outline" onClick={cancelEdit}>Avbryt</Button>
-              <Button className="bg-slate-700 hover:bg-slate-800" onClick={saveEdit}>Spara</Button>
+              <Button className="bg-slate-700 hover:bg-slate-800" disabled={isSaving} onClick={() => void saveEdit()}>
+                {isSaving ? 'Sparar...' : 'Spara'}
+              </Button>
             </CardFooter>
           </Card>
         </div>

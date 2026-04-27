@@ -60,12 +60,19 @@ export interface VisitorContextType {
   logs: LogEntry[];
   uniqueHosts: SavedHost[];
   uniqueVisitors: SavedVisitor[];
+  syncStatus: 'idle' | 'loading' | 'saving' | 'error';
+  syncError?: string;
+  isRemoteConfigured: boolean;
+  hasBackendPin: boolean;
+  refreshData: () => Promise<void>;
+  setBackendPin: (pin: string) => Promise<boolean>;
+  clearBackendPin: () => void;
 
-  addVisitor: (visitor: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => void;
-  updateVisitor: (id: string, updates: Partial<Visitor>) => void;
-  checkIn: (visitorId: string, details?: Partial<Visitor>) => Visitor | undefined;
-  checkOut: (visitorId: string) => void;
-  registerWalkIn: (visitor: Omit<Visitor, 'id' | 'status' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => Visitor | undefined;
+  addVisitor: (visitor: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => Promise<Visitor | undefined>;
+  updateVisitor: (id: string, updates: Partial<Visitor>) => Promise<void>;
+  checkIn: (visitorId: string, details?: Partial<Visitor>) => Promise<Visitor | undefined>;
+  checkOut: (visitorId: string) => Promise<void>;
+  registerWalkIn: (visitor: Omit<Visitor, 'id' | 'status' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => Promise<Visitor | undefined>;
   notifyHost: (visitor: Visitor) => Promise<{
     status: NotificationStatus;
     message: string;
@@ -77,14 +84,14 @@ export interface VisitorContextType {
   // Data Management
   savedHosts: SavedHost[];
   savedVisitors: SavedVisitor[];
-  addSavedHost: (host: Omit<SavedHost, 'id'>) => void;
-  updateSavedHost: (id: string, host: Partial<SavedHost>) => void;
-  deleteSavedHost: (id: string) => void;
+  addSavedHost: (host: Omit<SavedHost, 'id'>) => Promise<void>;
+  updateSavedHost: (id: string, host: Partial<SavedHost>) => Promise<void>;
+  deleteSavedHost: (id: string) => Promise<void>;
 
-  addSavedVisitor: (visitor: Omit<SavedVisitor, 'id'>) => void;
-  updateSavedVisitor: (id: string, visitor: Partial<SavedVisitor>) => void;
-  deleteSavedVisitor: (id: string) => void;
+  addSavedVisitor: (visitor: Omit<SavedVisitor, 'id'>) => Promise<void>;
+  updateSavedVisitor: (id: string, visitor: Partial<SavedVisitor>) => Promise<void>;
+  deleteSavedVisitor: (id: string) => Promise<void>;
 
   exportBackup: () => VisitorDataBackup;
-  importBackup: (backup: unknown) => { success: boolean; message: string };
+  importBackup: (backup: unknown) => Promise<{ success: boolean; message: string }>;
 }

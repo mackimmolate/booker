@@ -172,7 +172,7 @@ const getSnapshot = async (supabase: ReturnType<typeof getSupabaseAdmin>) => {
   const [hosts, savedVisitors, visits, logs] = await Promise.all([
     supabase.from('hosts').select('*').order('name', { ascending: true }),
     supabase.from('saved_visitors').select('*').order('name', { ascending: true }),
-    supabase.from('visits').select('*').order('created_at', { ascending: false }),
+    supabase.from('visits').select('*').order('created_at', { ascending: true }),
     supabase.from('visit_logs').select('*').order('created_at', { ascending: false }),
   ]);
 
@@ -203,6 +203,24 @@ const createLog = async (
     notification_status: visit.notification_status ?? null,
     notification_recipient: visit.host_email ?? null,
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+const updateCheckInLogNotification = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  visit: JsonRecord
+) => {
+  const { error } = await supabase
+    .from('visit_logs')
+    .update({
+      notification_status: visit.notification_status ?? null,
+      notification_recipient: visit.host_email ?? null,
+    })
+    .eq('visit_id', visit.id)
+    .eq('action', 'check-in');
 
   if (error) {
     throw new Error(error.message);
@@ -496,6 +514,7 @@ const updateVisit = async (
   }
 
   await ensureRelatedRows(supabase, data);
+  await updateCheckInLogNotification(supabase, data);
 
   return toVisit(data);
 };

@@ -20,6 +20,7 @@ export const SavedDataList: React.FC = () => {
   const [editingVisitor, setEditingVisitor] = useState<string | null>(null);
   const [editVisitorName, setEditVisitorName] = useState('');
   const [editVisitorCompany, setEditVisitorCompany] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const startEditHost = (id: string, name: string, email?: string) => {
     setEditingHost(id);
@@ -27,13 +28,19 @@ export const SavedDataList: React.FC = () => {
     setEditHostEmail(email ?? '');
   };
 
-  const saveHost = (id: string) => {
+  const saveHost = async (id: string) => {
     if (!editHostName.trim()) {
       return;
     }
 
-    updateSavedHost(id, { name: editHostName, email: editHostEmail });
-    setEditingHost(null);
+    setErrorMessage('');
+
+    try {
+      await updateSavedHost(id, { name: editHostName, email: editHostEmail });
+      setEditingHost(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Det gick inte att spara v\u00e4rden.');
+    }
   };
 
   const cancelEditHost = () => {
@@ -48,13 +55,19 @@ export const SavedDataList: React.FC = () => {
     setEditVisitorCompany(company);
   };
 
-  const saveVisitor = (id: string) => {
+  const saveVisitor = async (id: string) => {
     if (!editVisitorName.trim() || !editVisitorCompany.trim()) {
       return;
     }
 
-    updateSavedVisitor(id, { name: editVisitorName, company: editVisitorCompany });
-    setEditingVisitor(null);
+    setErrorMessage('');
+
+    try {
+      await updateSavedVisitor(id, { name: editVisitorName, company: editVisitorCompany });
+      setEditingVisitor(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Det gick inte att spara bes\u00f6karen.');
+    }
   };
 
   const cancelEditVisitor = () => {
@@ -63,6 +76,11 @@ export const SavedDataList: React.FC = () => {
 
   return (
     <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+      {errorMessage && (
+        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 md:col-span-2">
+          {errorMessage}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{'Sparade v\u00e4rdar'}</CardTitle>
@@ -94,7 +112,7 @@ export const SavedDataList: React.FC = () => {
                       />
                     </div>
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => saveHost(host.id)} className="text-green-600">
+                      <Button size="sm" variant="ghost" onClick={() => void saveHost(host.id)} className="text-green-600">
                         <Save size={16} className="mr-1" /> Spara
                       </Button>
                       <Button size="sm" variant="ghost" onClick={cancelEditHost} className="text-red-600">
@@ -122,7 +140,9 @@ export const SavedDataList: React.FC = () => {
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => deleteSavedHost(host.id)}
+                        onClick={() => void deleteSavedHost(host.id).catch(error => {
+                          setErrorMessage(error instanceof Error ? error.message : 'Det gick inte att ta bort v\u00e4rden.');
+                        })}
                         className="h-8 w-8 text-red-600"
                       >
                         <Trash2 size={16} />
@@ -159,7 +179,7 @@ export const SavedDataList: React.FC = () => {
                       </div>
                     </div>
                     <div className="mt-2 flex justify-end gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => saveVisitor(visitor.id)} className="text-green-600">
+                      <Button size="sm" variant="ghost" onClick={() => void saveVisitor(visitor.id)} className="text-green-600">
                         <Save size={16} className="mr-1" /> Spara
                       </Button>
                       <Button size="sm" variant="ghost" onClick={cancelEditVisitor} className="text-red-600">
@@ -177,7 +197,14 @@ export const SavedDataList: React.FC = () => {
                       <Button size="icon" variant="ghost" onClick={() => startEditVisitor(visitor.id, visitor.name, visitor.company)} className="h-8 w-8 text-blue-600">
                         <Edit2 size={16} />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => deleteSavedVisitor(visitor.id)} className="h-8 w-8 text-red-600">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => void deleteSavedVisitor(visitor.id).catch(error => {
+                          setErrorMessage(error instanceof Error ? error.message : 'Det gick inte att ta bort bes\u00f6karen.');
+                        })}
+                        className="h-8 w-8 text-red-600"
+                      >
                         <Trash2 size={16} />
                       </Button>
                     </div>

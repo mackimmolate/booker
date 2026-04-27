@@ -35,8 +35,23 @@ export const ReceptionPage: React.FC = () => {
   const [successType, setSuccessType] = useState<'welcome' | 'goodbye'>('welcome');
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [operationError, setOperationError] = useState('');
+  const [setupPin, setSetupPin] = useState('');
+  const [setupError, setSetupError] = useState('');
   const t = translations[lang];
-  const { visitors, checkIn, checkOut, registerWalkIn, notifyHost, uniqueHosts } = useVisitorContext();
+  const {
+    visitors,
+    checkIn,
+    checkOut,
+    registerWalkIn,
+    notifyHost,
+    uniqueHosts,
+    isRemoteConfigured,
+    hasBackendPin,
+    setBackendPin,
+    syncStatus,
+    syncError,
+  } = useVisitorContext();
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -50,6 +65,7 @@ export const ReceptionPage: React.FC = () => {
     setMessage('');
     setSuccessType('welcome');
     setIsSubmitting(false);
+    setOperationError('');
   });
 
   useEffect(() => {
@@ -180,15 +196,22 @@ export const ReceptionPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    const checkedInVisitor = checkIn(id);
+    setOperationError('');
 
-    if (!checkedInVisitor) {
+    try {
+      const checkedInVisitor = await checkIn(id);
+
+      if (!checkedInVisitor) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      await finalizeCheckIn(checkedInVisitor);
+    } catch (error) {
+      setOperationError(error instanceof Error ? error.message : 'Incheckningen misslyckades.');
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    await finalizeCheckIn(checkedInVisitor);
-    setIsSubmitting(false);
   };
 
   const handleWalkIn = async (e: React.FormEvent) => {
@@ -198,22 +221,55 @@ export const ReceptionPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    const walkInVisitor = registerWalkIn({ ...formData, language: lang });
+    setOperationError('');
 
-    if (!walkInVisitor) {
+    try {
+      const walkInVisitor = await registerWalkIn({ ...formData, language: lang });
+
+      if (!walkInVisitor) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      await finalizeCheckIn(walkInVisitor);
+    } catch (error) {
+      setOperationError(error instanceof Error ? error.message : 'Registreringen misslyckades.');
+    } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCheckOut = async (id: string, name: string) => {
+    if (isSubmitting) {
       return;
     }
 
-    await finalizeCheckIn(walkInVisitor);
-    setIsSubmitting(false);
+    setIsSubmitting(true);
+    setOperationError('');
+
+    try {
+      await checkOut(id);
+      setMessage(t.goodbyeMessage.replace('{name}', name));
+      setSuccessType('goodbye');
+      setView('success');
+    } catch (error) {
+      setOperationError(error instanceof Error ? error.message : 'Utcheckningen misslyckades.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCheckOut = (id: string, name: string) => {
-    checkOut(id);
-    setMessage(t.goodbyeMessage.replace('{name}', name));
-    setSuccessType('goodbye');
-    setView('success');
+  const handleSetupSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSetupError('');
+
+    const success = await setBackendPin(setupPin);
+    if (!success) {
+      setSetupError('PIN kunde inte verifieras mot Supabase.');
+      return;
+    }
+
+    setSetupPin('');
   };
 
   const filteredVisitors = visitors.filter(v => {
@@ -234,6 +290,41 @@ export const ReceptionPage: React.FC = () => {
   const activeVisitors = visitors.filter(v =>
     v.status === 'checked-in' && v.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isRemoteConfigured && !hasBackendPin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 text-slate-950">
+        <Card className="w-full max-w-lg rounded-[2rem] border-slate-200 shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Reception setup</CardTitle>
+          </CardHeader>
+          <form onSubmit={handleSetupSubmit}>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-600">
+                {'Ange backend-PIN en g\u00e5ng p\u00e5 den h\u00e4r enheten. Den sparas lokalt i browsern och anv\u00e4nds f\u00f6r att skriva till Supabase.'}
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="kiosk-backend-pin">Backend-PIN</Label>
+                <Input
+                  id="kiosk-backend-pin"
+                  type="password"
+                  value={setupPin}
+                  onChange={event => setSetupPin(event.target.value)}
+                  autoFocus
+                />
+              </div>
+              {(setupError || syncError) && (
+                <p className="text-sm text-rose-600">{setupError || syncError}</p>
+              )}
+              <Button type="submit" disabled={syncStatus === 'loading'} className="w-full bg-slate-700 hover:bg-slate-800">
+                {syncStatus === 'loading' ? 'Verifierar...' : 'Spara och starta reception'}
+              </Button>
+            </CardContent>
+          </form>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100 text-slate-950">
@@ -267,6 +358,11 @@ export const ReceptionPage: React.FC = () => {
 
       <main className="flex-1 overscroll-contain p-4 md:p-8">
         <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
+          {operationError && (
+            <div className="fixed left-4 right-4 top-24 z-20 mx-auto max-w-3xl rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-center text-rose-700 shadow">
+              {operationError}
+            </div>
+          )}
           {view === 'home' && (
             <div className="grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
               <Button
@@ -439,7 +535,7 @@ export const ReceptionPage: React.FC = () => {
                         key={v.id}
                         variant="outline"
                         className="h-auto w-full justify-between rounded-2xl px-6 py-6 text-left text-lg md:px-8 md:py-8 md:text-2xl"
-                        onClick={() => handleCheckOut(v.id, v.name)}
+                        onClick={() => void handleCheckOut(v.id, v.name)}
                       >
                         <div className="flex flex-col items-start gap-1">
                           <span className="text-2xl font-bold md:text-3xl">{v.name}</span>

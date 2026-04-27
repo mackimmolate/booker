@@ -13,8 +13,10 @@ import {
   isAdminSessionActive,
   setAdminSessionActive,
 } from '@/lib/admin-auth';
+import { useVisitorContext } from '@/context/VisitorContext';
 
 export const AdminPage: React.FC = () => {
+  const { syncStatus, syncError, isRemoteConfigured, hasBackendPin, refreshData } = useVisitorContext();
   const [hasPinConfigured, setHasPinConfigured] = useState(() => hasConfiguredAdminPin());
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => hasConfiguredAdminPin() && isAdminSessionActive()
@@ -68,6 +70,25 @@ export const AdminPage: React.FC = () => {
           ? 'Hostnotifiering via e-post \u00e4r konfigurerad. Nya incheckningar kan skicka ett riktigt meddelande.'
           : 'Hosters e-postadresser kan sparas redan nu. Sj\u00e4lva utskicket aktiveras n\u00e4r Supabase- och notifieringsmilj\u00f6variablerna \u00e4r satta.'}
       </div>
+
+      {isRemoteConfigured && (
+        <div className={`mb-6 flex flex-col gap-3 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between ${
+          hasBackendPin && syncStatus !== 'error'
+            ? 'border-sky-200 bg-sky-50 text-sky-800'
+            : 'border-amber-200 bg-amber-50 text-amber-800'
+        }`}>
+          <span>
+            {hasBackendPin
+              ? `Supabase-synk \u00e4r aktiv (${syncStatus}).${syncError ? ` ${syncError}` : ''}`
+              : 'Supabase \u00e4r konfigurerat, men backend-PIN saknas p\u00e5 den h\u00e4r enheten. Testa Supabase-panelen nedan en g\u00e5ng.'}
+          </span>
+          {hasBackendPin && (
+            <Button type="button" variant="outline" size="sm" onClick={() => void refreshData()}>
+              Uppdatera data
+            </Button>
+          )}
+        </div>
+      )}
 
       <AddVisitorForm />
       <VisitorList />

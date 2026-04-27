@@ -36,13 +36,13 @@ export const BackupPanel: React.FC = () => {
       return;
     }
 
-    if (!window.confirm('Import ers\u00e4tter all nuvarande lokal data. Vill du forts\u00e4tta?')) {
+    if (!window.confirm('Import kan ers\u00e4tta lokal fallback-data. Vill du forts\u00e4tta?')) {
       return;
     }
 
     try {
       const parsedBackup = JSON.parse(await file.text()) as unknown;
-      const result = importBackup(parsedBackup);
+      const result = await importBackup(parsedBackup);
       setStatus(result.message);
     } catch {
       setStatus('Det gick inte att l\u00e4sa backupfilen.');
@@ -56,7 +56,7 @@ export const BackupPanel: React.FC = () => {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p className="text-sm text-gray-600">
-          {'Exportera en JSON-backup innan du flyttar datan till surfplattan, eller importera en tidigare backup f\u00f6r att \u00e5terst\u00e4lla lokalt sparad data.'}
+          {'Exporten tar en JSON-kopia av aktuell data. Import \u00e4r bara aktiv i lokal fallback och ska inte anv\u00e4ndas f\u00f6r Supabase utan en separat migrering.'}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button type="button" variant="outline" className="gap-2" onClick={handleExport}>

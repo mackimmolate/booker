@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   type LogEntry,
   type NotificationStatus,
@@ -9,6 +17,24 @@ import {
   type VisitorDataBackup,
   type VisitorStatus,
 } from '../types';
+import {
+  BOOKER_API_PIN_CHANGED_EVENT,
+  checkInBookerVisit,
+  checkOutBookerVisit,
+  clearStoredBookerApiPin,
+  createBookerHost,
+  createBookerSavedVisitor,
+  createBookerVisit,
+  deleteBookerHost,
+  deleteBookerSavedVisitor,
+  fetchBookerSnapshot,
+  getStoredBookerApiPin,
+  isBookerApiConfigured,
+  registerBookerWalkIn,
+  setStoredBookerApiPin,
+  updateBookerVisit,
+  type BookerSnapshot,
+} from '@/lib/booker-api';
 import { isHostNotificationConfigured, sendHostNotification } from '@/lib/host-notifications';
 
 const VisitorContext = createContext<VisitorContextType | undefined>(undefined);
@@ -18,12 +44,7 @@ const STORAGE_KEY_LOGS = 'vms_logs';
 const STORAGE_KEY_SAVED_HOSTS = 'vms_saved_hosts';
 const STORAGE_KEY_SAVED_VISITORS = 'vms_saved_visitors';
 const BACKUP_VERSION = 1;
-const STORAGE_KEYS = [
-  STORAGE_KEY_VISITORS,
-  STORAGE_KEY_LOGS,
-  STORAGE_KEY_SAVED_HOSTS,
-  STORAGE_KEY_SAVED_VISITORS,
-] as const;
+const REMOTE_CONFIGURED = isBookerApiConfigured();
 
 const normalizeText = (value?: string) => value?.trim().replace(/\s+/g, ' ') ?? '';
 
@@ -52,6 +73,9 @@ const normalizeNotificationStatus = (value: unknown): NotificationStatus | undef
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+const toErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Ett ov\u00e4ntat fel uppstod.';
 
 const sanitizeVisitors = (value: unknown) => {
   if (!Array.isArray(value)) {
@@ -191,89 +215,257 @@ const sanitizeSavedVisitors = (value: unknown) => {
   }, []);
 };
 
-const loadVisitors = () => {
+const loadLegacyVisitors = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_VISITORS);
     return sanitizeVisitors(stored ? JSON.parse(stored) : []);
-  } catch (e) {
-    console.error('Failed to load visitors from local storage', e);
+  } catch {
     return [];
   }
 };
 
-const loadLogs = () => {
+const loadLegacyLogs = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_LOGS);
     return sanitizeLogs(stored ? JSON.parse(stored) : []);
-  } catch (e) {
-    console.error('Failed to load logs from local storage', e);
+  } catch {
     return [];
   }
 };
 
-const loadSavedHosts = () => {
+const loadLegacySavedHosts = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_SAVED_HOSTS);
     return sanitizeSavedHosts(stored ? JSON.parse(stored) : []);
-  } catch (e) {
-    console.error('Failed to load saved hosts from local storage', e);
+  } catch {
     return [];
   }
 };
 
-const loadSavedVisitors = () => {
+const loadLegacySavedVisitors = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_SAVED_VISITORS);
     return sanitizeSavedVisitors(stored ? JSON.parse(stored) : []);
-  } catch (e) {
-    console.error('Failed to load saved visitors from local storage', e);
+  } catch {
     return [];
   }
 };
 
+const createLog = (visitor: Visitor, action: LogEntry['action']): LogEntry => ({
+  id: crypto.randomUUID(),
+  visitorId: visitor.id,
+  visitorName: visitor.name,
+  company: visitor.company,
+  host: visitor.host,
+  action,
+  timestamp: new Date().toISOString(),
+  notificationStatus: visitor.notificationStatus,
+  notificationRecipient: visitor.hostEmail,
+});
+
+const mergeSavedHost = (
+  hosts: SavedHost[],
+  host: Omit<SavedHost, 'id'> | SavedHost,
+  options: { preserveEmailWhenEmpty: boolean }
+) => {
+  const normalizedName = normalizeText(host.name);
+  const normalizedEmail = normalizeEmail(host.email);
+
+  if (!normalizedName) {
+    return hosts;
+  }
+
+  const existingHost = 'id' in host
+    ? hosts.find(existing => existing.id === host.id)
+    : hosts.find(existing => existing.name.toLowerCase() === normalizedName.toLowerCase());
+
+  if (!existingHost) {
+    return [...hosts, {
+      id: 'id' in host && host.id ? host.id : crypto.randomUUID(),
+      name: normalizedName,
+      email: normalizedEmail,
+    }];
+  }
+
+  if (options.preserveEmailWhenEmpty && !normalizedEmail && existingHost.email) {
+    return hosts;
+  }
+
+  return hosts.map(existing =>
+    existing.id === existingHost.id
+      ? { ...existing, name: normalizedName, email: normalizedEmail }
+      : existing
+  );
+};
+
+const mergeSavedVisitor = (
+  visitors: SavedVisitor[],
+  visitor: Omit<SavedVisitor, 'id'> | SavedVisitor
+) => {
+  const normalizedName = normalizeText(visitor.name);
+  const normalizedCompany = normalizeText(visitor.company);
+
+  if (!normalizedName || !normalizedCompany) {
+    return visitors;
+  }
+
+  const existingVisitor = 'id' in visitor
+    ? visitors.find(existing => existing.id === visitor.id)
+    : visitors.find(existing => existing.name.toLowerCase() === normalizedName.toLowerCase());
+
+  if (!existingVisitor) {
+    return [...visitors, {
+      id: 'id' in visitor && visitor.id ? visitor.id : crypto.randomUUID(),
+      name: normalizedName,
+      company: normalizedCompany,
+    }];
+  }
+
+  return visitors.map(existing =>
+    existing.id === existingVisitor.id
+      ? { ...existing, name: normalizedName, company: normalizedCompany }
+      : existing
+  );
+};
+
 export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [visitors, setVisitors] = useState<Visitor[]>(loadVisitors);
-  const [logs, setLogs] = useState<LogEntry[]>(loadLogs);
-  const [savedHosts, setSavedHosts] = useState<SavedHost[]>(loadSavedHosts);
-  const [savedVisitors, setSavedVisitors] = useState<SavedVisitor[]>(loadSavedVisitors);
+  const [visitors, setVisitors] = useState<Visitor[]>(() => REMOTE_CONFIGURED ? [] : loadLegacyVisitors());
+  const [logs, setLogs] = useState<LogEntry[]>(() => REMOTE_CONFIGURED ? [] : loadLegacyLogs());
+  const [savedHosts, setSavedHosts] = useState<SavedHost[]>(() => REMOTE_CONFIGURED ? [] : loadLegacySavedHosts());
+  const [savedVisitors, setSavedVisitors] = useState<SavedVisitor[]>(() => REMOTE_CONFIGURED ? [] : loadLegacySavedVisitors());
+  const [syncStatus, setSyncStatus] = useState<VisitorContextType['syncStatus']>('idle');
+  const [syncError, setSyncError] = useState<string | undefined>(() =>
+    REMOTE_CONFIGURED && !getStoredBookerApiPin()
+      ? 'Backend-PIN saknas. Testa Supabase i adminpanelen f\u00f6r att aktivera synk.'
+      : undefined
+  );
+  const [hasBackendPin, setHasBackendPinState] = useState(() => Boolean(getStoredBookerApiPin()));
+
+  const applySnapshot = useCallback((snapshot: BookerSnapshot) => {
+    setSavedHosts(sanitizeSavedHosts(snapshot.hosts));
+    setSavedVisitors(sanitizeSavedVisitors(snapshot.savedVisitors));
+    setVisitors(sanitizeVisitors(snapshot.visits));
+    setLogs(sanitizeLogs(snapshot.logs));
+  }, []);
+
+  const refreshData = useCallback(async () => {
+    if (!REMOTE_CONFIGURED) {
+      setSyncStatus('idle');
+      setSyncError(undefined);
+      return;
+    }
+
+    const backendPin = getStoredBookerApiPin();
+    setHasBackendPinState(Boolean(backendPin));
+
+    if (!backendPin) {
+      setSyncStatus('idle');
+      setSyncError('Backend-PIN saknas. Testa Supabase i adminpanelen f\u00f6r att aktivera synk.');
+      return;
+    }
+
+    setSyncStatus('loading');
+    setSyncError(undefined);
+
+    try {
+      applySnapshot(await fetchBookerSnapshot(backendPin));
+      setSyncStatus('idle');
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncError(toErrorMessage(error));
+    }
+  }, [applySnapshot]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_VISITORS, JSON.stringify(visitors));
-  }, [visitors]);
+    if (!REMOTE_CONFIGURED) {
+      return;
+    }
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
-  }, [logs]);
+    void refreshData();
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_SAVED_HOSTS, JSON.stringify(savedHosts));
-  }, [savedHosts]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_SAVED_VISITORS, JSON.stringify(savedVisitors));
-  }, [savedVisitors]);
-
-  useEffect(() => {
-    const syncFromStorage = () => {
-      setVisitors(loadVisitors());
-      setLogs(loadLogs());
-      setSavedHosts(loadSavedHosts());
-      setSavedVisitors(loadSavedVisitors());
+    const handlePinChange = () => {
+      setHasBackendPinState(Boolean(getStoredBookerApiPin()));
+      void refreshData();
     };
 
-    const handleStorage = (event: StorageEvent) => {
-      if (!event.key || STORAGE_KEYS.includes(event.key as (typeof STORAGE_KEYS)[number])) {
-        syncFromStorage();
+    const handleFocus = () => {
+      if (getStoredBookerApiPin()) {
+        void refreshData();
       }
     };
 
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('focus', syncFromStorage);
+    window.addEventListener(BOOKER_API_PIN_CHANGED_EVENT, handlePinChange);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('focus', syncFromStorage);
+      window.removeEventListener(BOOKER_API_PIN_CHANGED_EVENT, handlePinChange);
+      window.removeEventListener('focus', handleFocus);
     };
+  }, [refreshData]);
+
+  const runRemoteMutation = useCallback(async <T,>(
+    operation: (backendPin: string) => Promise<T>
+  ) => {
+    const backendPin = getStoredBookerApiPin();
+
+    if (!backendPin) {
+      const message = 'Backend-PIN saknas. Testa Supabase i adminpanelen f\u00f6rst.';
+      setSyncStatus('error');
+      setSyncError(message);
+      throw new Error(message);
+    }
+
+    setSyncStatus('saving');
+    setSyncError(undefined);
+
+    try {
+      const result = await operation(backendPin);
+      applySnapshot(await fetchBookerSnapshot(backendPin));
+      setSyncStatus('idle');
+      return result;
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncError(toErrorMessage(error));
+      throw error;
+    }
+  }, [applySnapshot]);
+
+  const setBackendPin = useCallback(async (pin: string) => {
+    const normalizedPin = pin.trim();
+
+    if (!REMOTE_CONFIGURED || !normalizedPin) {
+      return false;
+    }
+
+    setSyncStatus('loading');
+    setSyncError(undefined);
+
+    try {
+      const snapshot = await fetchBookerSnapshot(normalizedPin);
+      setStoredBookerApiPin(normalizedPin);
+      setHasBackendPinState(true);
+      applySnapshot(snapshot);
+      setSyncStatus('idle');
+      return true;
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncError(toErrorMessage(error));
+      return false;
+    }
+  }, [applySnapshot]);
+
+  const clearBackendPin = useCallback(() => {
+    clearStoredBookerApiPin();
+    setHasBackendPinState(false);
+    setSyncStatus('idle');
+    setSyncError('Backend-PIN saknas. Testa Supabase i adminpanelen f\u00f6r att aktivera synk.');
+
+    if (REMOTE_CONFIGURED) {
+      setVisitors([]);
+      setLogs([]);
+      setSavedHosts([]);
+      setSavedVisitors([]);
+    }
   }, []);
 
   const uniqueHosts = useMemo(
@@ -285,242 +477,184 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     [savedVisitors]
   );
 
-  const findSavedHostByName = (hostName: string) => {
+  const findSavedHostByName = useCallback((hostName: string) => {
     const normalizedHostName = normalizeText(hostName).toLowerCase();
     return savedHosts.find(host => host.name.toLowerCase() === normalizedHostName);
-  };
+  }, [savedHosts]);
 
-  const resolveHostEmail = (hostName: string, explicitEmail?: string) =>
-    normalizeEmail(explicitEmail) ?? findSavedHostByName(hostName)?.email;
+  const resolveHostEmail = useCallback((hostName: string, explicitEmail?: string) =>
+    normalizeEmail(explicitEmail) ?? findSavedHostByName(hostName)?.email,
+  [findSavedHostByName]);
 
-  const addLog = (visitor: Visitor, action: LogEntry['action']) => {
-    const newLog: LogEntry = {
-      id: crypto.randomUUID(),
-      visitorId: visitor.id,
-      visitorName: visitor.name,
-      company: visitor.company,
-      host: visitor.host,
-      action,
-      timestamp: new Date().toISOString(),
-      notificationStatus: visitor.notificationStatus,
-      notificationRecipient: visitor.hostEmail,
-    };
-    setLogs(prev => [newLog, ...prev]);
-  };
-
-  const updateNotificationTracking = (
-    visitorId: string,
-    updates: Pick<
-      Visitor,
-      | 'hostEmail'
-      | 'notificationStatus'
-      | 'notificationChannel'
-      | 'notificationAttemptedAt'
-      | 'notificationSentAt'
-      | 'notificationError'
-    >
-  ) => {
-    setVisitors(prev =>
-      prev.map(visitor => (
-        visitor.id === visitorId
-          ? {
-              ...visitor,
-              ...updates,
-            }
-          : visitor
-      ))
-    );
-
-    setLogs(prev => {
-      let updated = false;
-
-      return prev.map(log => {
-        if (updated || log.visitorId !== visitorId || log.action !== 'check-in') {
-          return log;
-        }
-
-        updated = true;
-        return {
-          ...log,
-          notificationStatus: updates.notificationStatus,
-          notificationRecipient: updates.hostEmail,
-        };
-      });
-    });
-  };
-
-  const addSavedHost = (host: Omit<SavedHost, 'id'>) => {
+  const addSavedHost = useCallback<VisitorContextType['addSavedHost']>(async (host) => {
     const normalizedName = normalizeText(host.name);
     const normalizedEmail = normalizeEmail(host.email);
+
     if (!normalizedName) {
       return;
     }
 
-    setSavedHosts(prev => {
-      const existingHost = prev.find(existing => existing.name.toLowerCase() === normalizedName.toLowerCase());
-      if (!existingHost) {
-        return [...prev, { id: crypto.randomUUID(), name: normalizedName, email: normalizedEmail }];
-      }
-
-      if (existingHost.email === normalizedEmail || (!normalizedEmail && existingHost.email)) {
-        return prev;
-      }
-
-      return prev.map(existing =>
-        existing.id === existingHost.id
-          ? { ...existing, email: normalizedEmail }
-          : existing
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin =>
+        createBookerHost({ name: normalizedName, email: normalizedEmail }, backendPin)
       );
-    });
-  };
+      return;
+    }
 
-  const updateSavedHost = (id: string, updates: Partial<SavedHost>) => {
-    setSavedHosts(prev => {
-      const currentHost = prev.find(host => host.id === id);
-      if (!currentHost) {
-        return prev;
-      }
+    setSavedHosts(prev => mergeSavedHost(prev, { name: normalizedName, email: normalizedEmail }, {
+      preserveEmailWhenEmpty: true,
+    }));
+  }, [runRemoteMutation]);
 
-      const nextName = updates.name === undefined ? currentHost.name : normalizeText(updates.name);
-      const nextEmail = updates.email === undefined ? currentHost.email : normalizeEmail(updates.email);
-      if (!nextName) {
-        return prev;
-      }
+  const updateSavedHost = useCallback<VisitorContextType['updateSavedHost']>(async (id, updates) => {
+    const currentHost = savedHosts.find(host => host.id === id);
 
-      if (prev.some(host => host.id !== id && host.name.toLowerCase() === nextName.toLowerCase())) {
-        return prev;
-      }
+    if (!currentHost) {
+      return;
+    }
 
-      return prev.map(host => host.id === id ? { ...host, name: nextName, email: nextEmail } : host);
-    });
-  };
+    const nextHost: SavedHost = {
+      ...currentHost,
+      ...updates,
+      name: updates.name === undefined ? currentHost.name : normalizeText(updates.name),
+      email: updates.email === undefined ? currentHost.email : normalizeEmail(updates.email),
+    };
 
-  const deleteSavedHost = (id: string) => {
-    setSavedHosts(prev => prev.filter(h => h.id !== id));
-  };
+    if (!nextHost.name) {
+      return;
+    }
 
-  const addSavedVisitor = (visitor: Omit<SavedVisitor, 'id'>) => {
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin => createBookerHost(nextHost, backendPin));
+      return;
+    }
+
+    setSavedHosts(prev => mergeSavedHost(prev, nextHost, { preserveEmailWhenEmpty: false }));
+  }, [runRemoteMutation, savedHosts]);
+
+  const deleteSavedHost = useCallback<VisitorContextType['deleteSavedHost']>(async (id) => {
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin => deleteBookerHost(id, backendPin));
+      return;
+    }
+
+    setSavedHosts(prev => prev.filter(host => host.id !== id));
+  }, [runRemoteMutation]);
+
+  const addSavedVisitor = useCallback<VisitorContextType['addSavedVisitor']>(async (visitor) => {
     const normalizedName = normalizeText(visitor.name);
     const normalizedCompany = normalizeText(visitor.company);
+
     if (!normalizedName || !normalizedCompany) {
       return;
     }
 
-    setSavedVisitors(prev => {
-      if (prev.some(savedVisitor => savedVisitor.name.toLowerCase() === normalizedName.toLowerCase())) {
-        return prev;
-      }
-
-      return [...prev, { id: crypto.randomUUID(), name: normalizedName, company: normalizedCompany }];
-    });
-  };
-
-  const updateSavedVisitor = (id: string, updates: Partial<SavedVisitor>) => {
-    setSavedVisitors(prev => {
-      const currentVisitor = prev.find(visitor => visitor.id === id);
-      if (!currentVisitor) {
-        return prev;
-      }
-
-      const nextName = updates.name === undefined ? currentVisitor.name : normalizeText(updates.name);
-      const nextCompany = updates.company === undefined ? currentVisitor.company : normalizeText(updates.company);
-      if (!nextName || !nextCompany) {
-        return prev;
-      }
-
-      if (prev.some(visitor => visitor.id !== id && visitor.name.toLowerCase() === nextName.toLowerCase())) {
-        return prev;
-      }
-
-      return prev.map(visitor => visitor.id === id
-        ? { ...visitor, name: nextName, company: nextCompany }
-        : visitor
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin =>
+        createBookerSavedVisitor({ name: normalizedName, company: normalizedCompany }, backendPin)
       );
-    });
-  };
-
-  const deleteSavedVisitor = (id: string) => {
-    setSavedVisitors(prev => prev.filter(v => v.id !== id));
-  };
-
-  const addVisitor = (data: Omit<Visitor, 'id' | 'status' | 'language' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => {
-    const normalizedName = normalizeText(data.name);
-    const normalizedCompany = normalizeText(data.company);
-    const normalizedHost = normalizeText(data.host);
-    const resolvedHostEmail = resolveHostEmail(normalizedHost, data.hostEmail);
-    if (!normalizedName || !normalizedCompany || !normalizedHost) {
       return;
     }
 
-    const newVisitor: Visitor = {
-      ...data,
-      name: normalizedName,
-      company: normalizedCompany,
-      host: normalizedHost,
-      hostEmail: resolvedHostEmail,
-      phone: normalizeOptionalText(data.phone),
-      id: crypto.randomUUID(),
-      status: 'booked',
-      language: 'sv',
-      preBooked: true,
+    setSavedVisitors(prev => mergeSavedVisitor(prev, { name: normalizedName, company: normalizedCompany }));
+  }, [runRemoteMutation]);
+
+  const updateSavedVisitor = useCallback<VisitorContextType['updateSavedVisitor']>(async (id, updates) => {
+    const currentVisitor = savedVisitors.find(visitor => visitor.id === id);
+
+    if (!currentVisitor) {
+      return;
+    }
+
+    const nextVisitor: SavedVisitor = {
+      ...currentVisitor,
+      ...updates,
+      name: updates.name === undefined ? currentVisitor.name : normalizeText(updates.name),
+      company: updates.company === undefined ? currentVisitor.company : normalizeText(updates.company),
     };
 
-    setVisitors(prev => [...prev, newVisitor]);
-    addLog(newVisitor, 'registered');
-    addSavedHost({ name: newVisitor.host, email: newVisitor.hostEmail });
-    addSavedVisitor({ name: newVisitor.name, company: newVisitor.company });
-  };
+    if (!nextVisitor.name || !nextVisitor.company) {
+      return;
+    }
 
-  const registerWalkIn = (data: Omit<Visitor, 'id' | 'status' | 'preBooked' | 'notificationStatus' | 'notificationChannel' | 'notificationAttemptedAt' | 'notificationSentAt' | 'notificationError'>) => {
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin => createBookerSavedVisitor(nextVisitor, backendPin));
+      return;
+    }
+
+    setSavedVisitors(prev => mergeSavedVisitor(prev, nextVisitor));
+  }, [runRemoteMutation, savedVisitors]);
+
+  const deleteSavedVisitor = useCallback<VisitorContextType['deleteSavedVisitor']>(async (id) => {
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin => deleteBookerSavedVisitor(id, backendPin));
+      return;
+    }
+
+    setSavedVisitors(prev => prev.filter(visitor => visitor.id !== id));
+  }, [runRemoteMutation]);
+
+  const addVisitor = useCallback<VisitorContextType['addVisitor']>(async (data) => {
     const normalizedName = normalizeText(data.name);
     const normalizedCompany = normalizeText(data.company);
     const normalizedHost = normalizeText(data.host);
     const resolvedHostEmail = resolveHostEmail(normalizedHost, data.hostEmail);
+
     if (!normalizedName || !normalizedCompany || !normalizedHost) {
       return undefined;
     }
 
-    const newVisitor: Visitor = {
+    const visit = {
       ...data,
       name: normalizedName,
       company: normalizedCompany,
       host: normalizedHost,
       hostEmail: resolvedHostEmail,
       phone: normalizeOptionalText(data.phone),
+      expectedArrival: normalizeOptionalText(data.expectedArrival),
+      preBooked: true,
+      status: 'booked' as VisitorStatus,
+      language: 'sv' as const,
+    };
+
+    if (REMOTE_CONFIGURED) {
+      const result = await runRemoteMutation(backendPin => createBookerVisit(visit, backendPin));
+      return result.visit;
+    }
+
+    const newVisitor: Visitor = {
+      ...visit,
       id: crypto.randomUUID(),
-      status: 'checked-in',
-      preBooked: false,
-      checkInTime: new Date().toISOString(),
-      notificationStatus: undefined,
-      notificationChannel: undefined,
-      notificationAttemptedAt: undefined,
-      notificationSentAt: undefined,
-      notificationError: undefined,
     };
 
     setVisitors(prev => [...prev, newVisitor]);
-    addLog(newVisitor, 'check-in');
-    addSavedHost({ name: newVisitor.host, email: newVisitor.hostEmail });
-    addSavedVisitor({ name: newVisitor.name, company: newVisitor.company });
+    setLogs(prev => [createLog(newVisitor, 'registered'), ...prev]);
+    setSavedHosts(prev => mergeSavedHost(prev, { name: newVisitor.host, email: newVisitor.hostEmail }, {
+      preserveEmailWhenEmpty: true,
+    }));
+    setSavedVisitors(prev => mergeSavedVisitor(prev, { name: newVisitor.name, company: newVisitor.company }));
 
     return newVisitor;
-  };
+  }, [resolveHostEmail, runRemoteMutation]);
 
-  const checkIn = (visitorId: string, details?: Partial<Visitor>) => {
-    const currentVisitor = visitors.find(visitor => visitor.id === visitorId);
-    if (!currentVisitor) {
+  const registerWalkIn = useCallback<VisitorContextType['registerWalkIn']>(async (data) => {
+    const normalizedName = normalizeText(data.name);
+    const normalizedCompany = normalizeText(data.company);
+    const normalizedHost = normalizeText(data.host);
+    const resolvedHostEmail = resolveHostEmail(normalizedHost, data.hostEmail);
+
+    if (!normalizedName || !normalizedCompany || !normalizedHost) {
       return undefined;
     }
 
-    const nextHost = details?.host === undefined ? currentVisitor.host : normalizeText(details.host);
-    const nextHostEmail = details?.hostEmail === undefined
-      ? resolveHostEmail(nextHost, currentVisitor.hostEmail)
-      : resolveHostEmail(nextHost, details.hostEmail);
-    const updatedVisitor: Visitor = {
-      ...currentVisitor,
-      ...details,
-      host: nextHost,
-      hostEmail: nextHostEmail,
+    const visit = {
+      ...data,
+      name: normalizedName,
+      company: normalizedCompany,
+      host: normalizedHost,
+      hostEmail: resolvedHostEmail,
+      phone: normalizeOptionalText(data.phone),
+      preBooked: false,
       status: 'checked-in' as VisitorStatus,
       checkInTime: new Date().toISOString(),
       notificationStatus: undefined,
@@ -530,37 +664,99 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       notificationError: undefined,
     };
 
-    setVisitors(prev => prev.map(visitor => (
-      visitor.id === visitorId ? updatedVisitor : visitor
-    )));
+    if (REMOTE_CONFIGURED) {
+      const result = await runRemoteMutation(backendPin => registerBookerWalkIn(visit, backendPin));
+      return result.visit;
+    }
 
-    addLog(updatedVisitor, 'check-in');
-    addSavedHost({ name: updatedVisitor.host, email: updatedVisitor.hostEmail });
-    addSavedVisitor({ name: updatedVisitor.name, company: updatedVisitor.company });
+    const newVisitor: Visitor = {
+      ...visit,
+      id: crypto.randomUUID(),
+    };
+
+    setVisitors(prev => [...prev, newVisitor]);
+    setLogs(prev => [createLog(newVisitor, 'check-in'), ...prev]);
+    setSavedHosts(prev => mergeSavedHost(prev, { name: newVisitor.host, email: newVisitor.hostEmail }, {
+      preserveEmailWhenEmpty: true,
+    }));
+    setSavedVisitors(prev => mergeSavedVisitor(prev, { name: newVisitor.name, company: newVisitor.company }));
+
+    return newVisitor;
+  }, [resolveHostEmail, runRemoteMutation]);
+
+  const checkIn = useCallback<VisitorContextType['checkIn']>(async (visitorId, details) => {
+    const currentVisitor = visitors.find(visitor => visitor.id === visitorId);
+
+    if (!currentVisitor) {
+      return undefined;
+    }
+
+    const nextHost = details?.host === undefined ? currentVisitor.host : normalizeText(details.host);
+    const nextHostEmail = details?.hostEmail === undefined
+      ? resolveHostEmail(nextHost, currentVisitor.hostEmail)
+      : resolveHostEmail(nextHost, details.hostEmail);
+
+    const updatedVisitor: Visitor = {
+      ...currentVisitor,
+      ...details,
+      host: nextHost,
+      hostEmail: nextHostEmail,
+      status: 'checked-in',
+      checkInTime: new Date().toISOString(),
+      notificationStatus: undefined,
+      notificationChannel: undefined,
+      notificationAttemptedAt: undefined,
+      notificationSentAt: undefined,
+      notificationError: undefined,
+    };
+
+    if (REMOTE_CONFIGURED) {
+      const result = await runRemoteMutation(backendPin =>
+        checkInBookerVisit({
+          id: visitorId,
+          ...details,
+          host: nextHost,
+          hostEmail: nextHostEmail,
+        }, backendPin)
+      );
+      return result.visit;
+    }
+
+    setVisitors(prev => prev.map(visitor => visitor.id === visitorId ? updatedVisitor : visitor));
+    setLogs(prev => [createLog(updatedVisitor, 'check-in'), ...prev]);
+    setSavedHosts(prev => mergeSavedHost(prev, { name: updatedVisitor.host, email: updatedVisitor.hostEmail }, {
+      preserveEmailWhenEmpty: true,
+    }));
+    setSavedVisitors(prev => mergeSavedVisitor(prev, { name: updatedVisitor.name, company: updatedVisitor.company }));
 
     return updatedVisitor;
-  };
+  }, [resolveHostEmail, runRemoteMutation, visitors]);
 
-  const checkOut = (visitorId: string) => {
+  const checkOut = useCallback<VisitorContextType['checkOut']>(async (visitorId) => {
     const currentVisitor = visitors.find(visitor => visitor.id === visitorId);
+
     if (!currentVisitor) {
+      return;
+    }
+
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin => checkOutBookerVisit(visitorId, backendPin));
       return;
     }
 
     const updatedVisitor: Visitor = {
       ...currentVisitor,
-      status: 'checked-out' as VisitorStatus,
+      status: 'checked-out',
       checkOutTime: new Date().toISOString(),
     };
 
-    setVisitors(prev => prev.map(visitor => (
-      visitor.id === visitorId ? updatedVisitor : visitor
-    )));
-    addLog(updatedVisitor, 'check-out');
-  };
+    setVisitors(prev => prev.map(visitor => visitor.id === visitorId ? updatedVisitor : visitor));
+    setLogs(prev => [createLog(updatedVisitor, 'check-out'), ...prev]);
+  }, [runRemoteMutation, visitors]);
 
-  const updateVisitor = (id: string, updates: Partial<Visitor>) => {
+  const updateVisitor = useCallback<VisitorContextType['updateVisitor']>(async (id, updates) => {
     const currentVisitor = visitors.find(visitor => visitor.id === id);
+
     if (!currentVisitor) {
       return;
     }
@@ -568,6 +764,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     const nextName = updates.name === undefined ? currentVisitor.name : normalizeText(updates.name);
     const nextCompany = updates.company === undefined ? currentVisitor.company : normalizeText(updates.company);
     const nextHost = updates.host === undefined ? currentVisitor.host : normalizeText(updates.host);
+
     if (!nextName || !nextCompany || !nextHost) {
       return;
     }
@@ -591,19 +788,69 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
         : normalizeOptionalText(updates.notificationError),
     };
 
-    setVisitors(prev => prev.map(visitor => (
-      visitor.id === id ? updatedVisitor : visitor
-    )));
-    addSavedHost({ name: updatedVisitor.host, email: updatedVisitor.hostEmail });
-    addSavedVisitor({ name: updatedVisitor.name, company: updatedVisitor.company });
-  };
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin => updateBookerVisit(updatedVisitor, backendPin));
+      return;
+    }
 
-  const notifyHost: VisitorContextType['notifyHost'] = async (visitor) => {
+    setVisitors(prev => prev.map(visitor => visitor.id === id ? updatedVisitor : visitor));
+    setSavedHosts(prev => mergeSavedHost(prev, { name: updatedVisitor.host, email: updatedVisitor.hostEmail }, {
+      preserveEmailWhenEmpty: true,
+    }));
+    setSavedVisitors(prev => mergeSavedVisitor(prev, { name: updatedVisitor.name, company: updatedVisitor.company }));
+  }, [resolveHostEmail, runRemoteMutation, visitors]);
+
+  const updateNotificationTracking = useCallback(async (
+    visitorId: string,
+    updates: Pick<
+      Visitor,
+      | 'hostEmail'
+      | 'notificationStatus'
+      | 'notificationChannel'
+      | 'notificationAttemptedAt'
+      | 'notificationSentAt'
+      | 'notificationError'
+    >
+  ) => {
+    if (REMOTE_CONFIGURED) {
+      await runRemoteMutation(backendPin =>
+        updateBookerVisit({ id: visitorId, ...updates }, backendPin)
+      );
+      return;
+    }
+
+    setVisitors(prev =>
+      prev.map(visitor => (
+        visitor.id === visitorId
+          ? { ...visitor, ...updates }
+          : visitor
+      ))
+    );
+
+    setLogs(prev => {
+      let updated = false;
+
+      return prev.map(log => {
+        if (updated || log.visitorId !== visitorId || log.action !== 'check-in') {
+          return log;
+        }
+
+        updated = true;
+        return {
+          ...log,
+          notificationStatus: updates.notificationStatus,
+          notificationRecipient: updates.hostEmail,
+        };
+      });
+    });
+  }, [runRemoteMutation]);
+
+  const notifyHost = useCallback<VisitorContextType['notifyHost']>(async (visitor) => {
     const attemptedAt = new Date().toISOString();
     const hostEmail = resolveHostEmail(visitor.host, visitor.hostEmail);
 
     if (!hostEmail) {
-      updateNotificationTracking(visitor.id, {
+      await updateNotificationTracking(visitor.id, {
         hostEmail: undefined,
         notificationStatus: 'skipped',
         notificationChannel: 'email',
@@ -618,10 +865,10 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       };
     }
 
-    addSavedHost({ name: visitor.host, email: hostEmail });
+    await addSavedHost({ name: visitor.host, email: hostEmail });
 
     if (!isHostNotificationConfigured()) {
-      updateNotificationTracking(visitor.id, {
+      await updateNotificationTracking(visitor.id, {
         hostEmail,
         notificationStatus: 'not-configured',
         notificationChannel: 'email',
@@ -637,7 +884,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       };
     }
 
-    updateNotificationTracking(visitor.id, {
+    await updateNotificationTracking(visitor.id, {
       hostEmail,
       notificationStatus: 'pending',
       notificationChannel: 'email',
@@ -657,7 +904,7 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       preBooked: visitor.preBooked,
     });
 
-    updateNotificationTracking(visitor.id, {
+    await updateNotificationTracking(visitor.id, {
       hostEmail,
       notificationStatus: result.status,
       notificationChannel: 'email',
@@ -667,26 +914,21 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
 
     return result;
-  };
+  }, [addSavedHost, resolveHostEmail, updateNotificationTracking]);
 
-  const exportBackup = (): VisitorDataBackup => ({
+  const exportBackup = useCallback((): VisitorDataBackup => ({
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     visitors,
     logs,
     savedHosts,
     savedVisitors,
-  });
+  }), [logs, savedHosts, savedVisitors, visitors]);
 
-  const importBackup = (backup: unknown) => {
+  const importBackup = useCallback<VisitorContextType['importBackup']>(async (backup) => {
     if (!isRecord(backup)) {
       return { success: false, message: 'Backupfilen har fel format.' };
     }
-
-    const nextVisitors = sanitizeVisitors(backup.visitors);
-    const nextLogs = sanitizeLogs(backup.logs);
-    const nextSavedHosts = sanitizeSavedHosts(backup.savedHosts);
-    const nextSavedVisitors = sanitizeSavedVisitors(backup.savedVisitors);
 
     if (
       !Array.isArray(backup.visitors) ||
@@ -697,16 +939,23 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       return { success: false, message: 'Backupfilen saknar n\u00f6dv\u00e4ndiga listor.' };
     }
 
-    setVisitors(nextVisitors);
-    setLogs(nextLogs);
-    setSavedHosts(nextSavedHosts);
-    setSavedVisitors(nextSavedVisitors);
+    if (REMOTE_CONFIGURED) {
+      return {
+        success: false,
+        message: 'Import till Supabase \u00e4r inte aktiverad \u00e4n. Export fungerar, men import ska g\u00f6ras via en separat migrering.',
+      };
+    }
+
+    setVisitors(sanitizeVisitors(backup.visitors));
+    setLogs(sanitizeLogs(backup.logs));
+    setSavedHosts(sanitizeSavedHosts(backup.savedHosts));
+    setSavedVisitors(sanitizeSavedVisitors(backup.savedVisitors));
 
     return {
       success: true,
-      message: 'Backupen importerades och ersatte den lokala datan.',
+      message: 'Backupen importerades till den lokala fallback-datan.',
     };
-  };
+  }, []);
 
   return (
     <VisitorContext.Provider value={{
@@ -714,8 +963,13 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       logs,
       uniqueHosts,
       uniqueVisitors,
-      savedHosts,
-      savedVisitors,
+      syncStatus,
+      syncError,
+      isRemoteConfigured: REMOTE_CONFIGURED,
+      hasBackendPin,
+      refreshData,
+      setBackendPin,
+      clearBackendPin,
 
       addVisitor,
       updateVisitor,
@@ -724,6 +978,8 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
       registerWalkIn,
       notifyHost,
 
+      savedHosts,
+      savedVisitors,
       addSavedHost,
       updateSavedHost,
       deleteSavedHost,

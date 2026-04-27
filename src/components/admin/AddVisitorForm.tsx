@@ -16,6 +16,8 @@ export const AddVisitorForm: React.FC = () => {
   const [host, setHost] = useState('');
   const [hostEmail, setHostEmail] = useState('');
   const [expectedArrival, setExpectedArrival] = useState(() => getRoundedCurrentIso());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleNameChange = (newName: string) => {
     setName(newName);
@@ -33,23 +35,32 @@ export const AddVisitorForm: React.FC = () => {
     setHostEmail(knownHost?.email ?? '');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !company || !host) return;
+    if (isSubmitting || !name || !company || !host) return;
 
-    addVisitor({
-      name,
-      company,
-      host,
-      hostEmail,
-      expectedArrival,
-    });
+    setIsSubmitting(true);
+    setErrorMessage('');
 
-    setName('');
-    setCompany('');
-    setHost('');
-    setHostEmail('');
-    setExpectedArrival(getRoundedCurrentIso());
+    try {
+      await addVisitor({
+        name,
+        company,
+        host,
+        hostEmail,
+        expectedArrival,
+      });
+
+      setName('');
+      setCompany('');
+      setHost('');
+      setHostEmail('');
+      setExpectedArrival(getRoundedCurrentIso());
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Det gick inte att spara bokningen.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -115,10 +126,15 @@ export const AddVisitorForm: React.FC = () => {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">
-              {'Spara hostens e-post nu s\u00e5 \u00e4r bokningen redo n\u00e4r Supabase-notifiering aktiveras.'}
-            </p>
-            <Button type="submit" className="bg-slate-700 hover:bg-slate-800">Spara bokning</Button>
+            <div className="space-y-1 text-sm">
+              <p className="text-slate-500">
+                {'Spara hostens e-post nu s\u00e5 \u00e4r bokningen redo n\u00e4r Supabase-notifiering aktiveras.'}
+              </p>
+              {errorMessage && <p className="text-rose-600">{errorMessage}</p>}
+            </div>
+            <Button type="submit" disabled={isSubmitting} className="bg-slate-700 hover:bg-slate-800">
+              {isSubmitting ? 'Sparar...' : 'Spara bokning'}
+            </Button>
           </CardFooter>
         </form>
       </Card>
