@@ -48,9 +48,9 @@ const toNotificationStatus = (value: unknown): NotificationStatus | null => {
 const getHostNotificationConfig = (): HostNotificationConfig | null => {
   const explicitEndpoint = normalizeText(import.meta.env.VITE_NOTIFICATION_ENDPOINT);
   const supabaseUrl = normalizeText(import.meta.env.VITE_SUPABASE_URL).replace(/\/+$/, '');
-  const functionName = normalizeText(import.meta.env.VITE_NOTIFY_FUNCTION_NAME) || 'notify-host';
+  const functionName = normalizeText(import.meta.env.VITE_NOTIFY_FUNCTION_NAME);
   const anonKey = normalizeText(import.meta.env.VITE_SUPABASE_ANON_KEY);
-  const endpoint = explicitEndpoint || (supabaseUrl ? `${supabaseUrl}/functions/v1/${functionName}` : '');
+  const endpoint = explicitEndpoint || (supabaseUrl && functionName ? `${supabaseUrl}/functions/v1/${functionName}` : '');
 
   if (!endpoint || !anonKey) {
     return null;

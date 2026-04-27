@@ -18,10 +18,9 @@ A Modern PWA for Visitor Management.
 - Set `VITE_ADMIN_PIN` in a local env file, or create a browser-local PIN on the first `/admin` visit.
 
 ## Host Notifications
-- The frontend is prepared for a Supabase Edge Function named `notify-host`.
-- Save `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in your env file when that backend exists.
-- If you prefer a custom endpoint, set `VITE_NOTIFICATION_ENDPOINT` instead.
-- Until the backend is configured, the kiosk will register the visitor arrival without claiming that an email was actually sent.
+- The frontend is prepared for a future Supabase Edge Function such as `notify-host`.
+- Set `VITE_NOTIFY_FUNCTION_NAME` or `VITE_NOTIFICATION_ENDPOINT` only after that notification backend exists.
+- Until the notification backend is configured, the kiosk registers the visitor arrival without claiming that an email was sent.
 
 ## Supabase API
 - `supabase/functions/booker-api/index.ts` is the first controlled Edge Function for database access.

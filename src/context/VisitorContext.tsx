@@ -341,6 +341,30 @@ export const VisitorProvider: React.FC<{ children: ReactNode }> = ({ children })
   );
   const [hasBackendPin, setHasBackendPinState] = useState(() => Boolean(getStoredBookerApiPin()));
 
+  useEffect(() => {
+    if (!REMOTE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY_VISITORS, JSON.stringify(visitors));
+    }
+  }, [visitors]);
+
+  useEffect(() => {
+    if (!REMOTE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+    }
+  }, [logs]);
+
+  useEffect(() => {
+    if (!REMOTE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY_SAVED_HOSTS, JSON.stringify(savedHosts));
+    }
+  }, [savedHosts]);
+
+  useEffect(() => {
+    if (!REMOTE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY_SAVED_VISITORS, JSON.stringify(savedVisitors));
+    }
+  }, [savedVisitors]);
+
   const applySnapshot = useCallback((snapshot: BookerSnapshot) => {
     setSavedHosts(sanitizeSavedHosts(snapshot.hosts));
     setSavedVisitors(sanitizeSavedVisitors(snapshot.savedVisitors));

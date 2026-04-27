@@ -44,7 +44,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_BOOKER_API_FUNCTION_NAME: ${{ vars.VITE_BOOKER_API_FUNCTION_NAME || 'booker-api' }}
           VITE_BOOKER_API_ENDPOINT: ${{ vars.VITE_BOOKER_API_ENDPOINT }}
-          VITE_NOTIFY_FUNCTION_NAME: ${{ vars.VITE_NOTIFY_FUNCTION_NAME || 'notify-host' }}
+          VITE_NOTIFY_FUNCTION_NAME: ${{ vars.VITE_NOTIFY_FUNCTION_NAME }}
           VITE_NOTIFICATION_ENDPOINT: ${{ vars.VITE_NOTIFICATION_ENDPOINT }}
 
       - name: Upload GitHub Pages artifact
